@@ -19,6 +19,29 @@ T = TypeVar("T", bound=BaseModel)
 
 ChatMessage = dict[str, str]
 
+_http_client: httpx.AsyncClient | None = None
+
+
+def http_timeout(seconds: int) -> httpx.Timeout:
+    return httpx.Timeout(connect=25.0, read=float(seconds), write=30.0, pool=15.0)
+
+
+async def llm_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(
+            timeout=http_timeout(120),
+            limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
+        )
+    return _http_client
+
+
+async def close_llm_client() -> None:
+    global _http_client
+    if _http_client is not None:
+        await _http_client.aclose()
+        _http_client = None
+
 
 def money(value: Decimal | float | int) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
@@ -83,13 +106,18 @@ async def _post_completion(
 ) -> dict[str, Any]:
     assert_neuraldeep_model(str(payload["model"]))
     url = f"{runtime.base_url}/chat/completions"
-    async with httpx.AsyncClient(timeout=runtime.timeout_seconds) as client:
-        try:
-            response = await client.post(url, headers=_headers(runtime), json=payload)
-        except httpx.TimeoutException as exc:
-            raise LLMTimeoutError() from exc
-        except httpx.RequestError as exc:
-            raise LLMResponseError("NeuralDEEP connection failed") from exc
+    client = await llm_client()
+    try:
+        response = await client.post(
+            url,
+            headers=_headers(runtime),
+            json=payload,
+            timeout=http_timeout(max(runtime.timeout_seconds, 120)),
+        )
+    except httpx.TimeoutException as exc:
+        raise LLMTimeoutError() from exc
+    except httpx.RequestError as exc:
+        raise LLMResponseError("NeuralDEEP connection failed") from exc
     if response.status_code >= 400:
         _raise_http_error(response)
     return response.json()
@@ -111,9 +139,11 @@ async def complete_text(
     temperature: float,
     max_tokens: int,
     session_key: str,
+    max_retries: int | None = None,
 ) -> tuple[str, UsageInfo]:
     last_error: Exception | None = None
-    for attempt in range(runtime.max_retries + 1):
+    retries = runtime.max_retries if max_retries is None else max_retries
+    for attempt in range(retries + 1):
         try:
             payload = await _post_completion(
                 runtime,
@@ -137,7 +167,7 @@ async def complete_text(
             if "rejected the API key" in str(exc):
                 raise
             last_error = exc
-        if attempt < runtime.max_retries:
+        if attempt < retries:
             await asyncio.sleep(0.8 * (attempt + 1))
             continue
         break
@@ -171,10 +201,13 @@ async def complete_structured(
     temperature: float,
     max_tokens: int,
     session_key: str,
+    max_retries: int | None = None,
 ) -> tuple[T, UsageInfo]:
     last_error: Exception | None = None
     working_messages = list(messages)
-    for attempt in range(runtime.max_retries + 1):
+    schema_keys = ", ".join(schema.model_fields.keys())
+    retries = runtime.max_retries if max_retries is None else max_retries
+    for attempt in range(retries + 1):
         try:
             payload = await _post_completion(
                 runtime,
@@ -193,18 +226,16 @@ async def complete_structured(
         except (ValidationError, LLMResponseError, json.JSONDecodeError) as exc:
             logger.warning("Structured output attempt %s failed: %s", attempt + 1, exc)
             last_error = exc
-            if isinstance(exc, ValidationError) and attempt < runtime.max_retries:
+            if attempt < retries:
                 working_messages = [
                     *working_messages,
                     {
                         "role": "user",
                         "content": (
-                            "Предыдущий JSON не прошёл схему. Верни тот же смысл, "
-                            "но строго с ключами: company_name, contact_name, role_title, "
-                            "industry, product, hidden_pain, surface_request, "
-                            "previous_experience, initial_stance, trust_triggers, "
-                            "planned_objections, next_step_if_convinced. "
-                            f"Ошибки: {exc.error_count()}."
+                            "Предыдущий ответ неверный. Верни ТОЛЬКО один JSON-объект "
+                            f"строго с ключами: {schema_keys}. "
+                            "Не возвращай карточку клиента и не пиши текст вне JSON. "
+                            f"Ошибка: {exc}."
                         ),
                     },
                 ]
@@ -212,7 +243,7 @@ async def complete_structured(
             last_error = exc
         except RateLimitError as exc:
             last_error = exc
-        if attempt < runtime.max_retries:
+        if attempt < retries:
             await asyncio.sleep(0.8 * (attempt + 1))
     if isinstance(last_error, LLMTimeoutError):
         raise last_error
@@ -227,6 +258,7 @@ async def stream_text(
     temperature: float,
     max_tokens: int,
     session_key: str,
+    max_retries: int | None = None,
 ) -> AsyncIterator[tuple[str, UsageInfo | None]]:
     assert_neuraldeep_model(model)
     payload = {
@@ -238,13 +270,21 @@ async def stream_text(
         "stream": True,
         "stream_options": {"include_usage": True},
     }
-    collected: list[str] = []
-    final_usage: UsageInfo | None = None
     url = f"{runtime.base_url}/chat/completions"
-    try:
-        async with httpx.AsyncClient(timeout=runtime.timeout_seconds) as client:
+    last_error: Exception | None = None
+    retries = runtime.max_retries if max_retries is None else max_retries
+
+    for attempt in range(retries + 1):
+        collected: list[str] = []
+        final_usage: UsageInfo | None = None
+        try:
+            client = await llm_client()
             async with client.stream(
-                "POST", url, headers=_headers(runtime), json=payload
+                "POST",
+                url,
+                headers=_headers(runtime),
+                json=payload,
+                timeout=http_timeout(max(runtime.timeout_seconds, 120)),
             ) as response:
                 if response.status_code >= 400:
                     await response.aread()
@@ -266,22 +306,117 @@ async def stream_text(
                     if delta:
                         collected.append(delta)
                         yield delta, None
+
+            text = "".join(collected).strip()
+            if not text:
+                raise LLMResponseError("LLM returned an empty stream")
+            if final_usage is None:
+                prompt_tokens = estimate_tokens(json.dumps(messages, ensure_ascii=False))
+                completion_tokens = estimate_tokens(text)
+                final_usage = UsageInfo(
+                    model=model,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=prompt_tokens + completion_tokens,
+                    cost_rub=calc_cost(runtime, model, prompt_tokens, completion_tokens),
+                )
+            yield "", final_usage
+            return
+        except httpx.TimeoutException as exc:
+            if collected:
+                raise LLMTimeoutError() from exc
+            last_error = LLMTimeoutError()
+            last_error.__cause__ = exc
+        except httpx.RequestError as exc:
+            logger.warning(
+                "NeuralDEEP stream connect failed (attempt %s): %s", attempt + 1, exc
+            )
+            if collected:
+                raise LLMResponseError("NeuralDEEP connection failed") from exc
+            last_error = LLMResponseError("NeuralDEEP connection failed")
+            last_error.__cause__ = exc
+        except LLMResponseError as exc:
+            if "rejected the API key" in str(exc):
+                raise
+            if collected:
+                raise
+            last_error = exc
+        if attempt < retries:
+            await asyncio.sleep(0.8 * (attempt + 1))
+            continue
+        break
+
+    if isinstance(last_error, LLMTimeoutError):
+        raise last_error
+    raise LLMResponseError("NeuralDEEP connection failed") from last_error
+
+
+async def transcribe_audio(
+    runtime: AIRuntimeSettings,
+    *,
+    content: bytes,
+    filename: str,
+    content_type: str,
+    model: str = "whisper-podlodka-turbo",
+    language: str = "ru",
+) -> tuple[str, UsageInfo]:
+    """Speech-to-text через NeuralDEEP (OpenAI-compatible /audio/transcriptions)."""
+    model = assert_neuraldeep_model(model)
+    url = f"{runtime.base_url.rstrip('/')}/audio/transcriptions"
+    headers = {"Authorization": f"Bearer {runtime.api_key}"}
+    files = {"file": (filename, content, content_type or "application/octet-stream")}
+    data = {
+        "model": model,
+        "language": language,
+        "response_format": "json",
+    }
+    try:
+        client = await llm_client()
+        response = await client.post(
+            url,
+            headers=headers,
+            files=files,
+            data=data,
+            timeout=http_timeout(max(runtime.timeout_seconds, 120)),
+        )
     except httpx.TimeoutException as exc:
         raise LLMTimeoutError() from exc
     except httpx.RequestError as exc:
         raise LLMResponseError("NeuralDEEP connection failed") from exc
 
-    text = "".join(collected).strip()
+    if response.status_code >= 400:
+        detail = response.text[:400]
+        logger.warning("NeuralDEEP STT error %s: %s", response.status_code, detail)
+        if response.status_code == 429:
+            raise RateLimitError("NeuralDEEP rate limit exceeded")
+        if response.status_code in {401, 403}:
+            raise LLMResponseError("NeuralDEEP rejected the API key")
+        # fallback model once
+        if model != "whisper-1":
+            return await transcribe_audio(
+                runtime,
+                content=content,
+                filename=filename,
+                content_type=content_type,
+                model="whisper-1",
+                language=language,
+            )
+        raise LLMResponseError(f"Speech recognition error {response.status_code}")
+
+    payload = response.json()
+    text = str(payload.get("text") or "").strip()
     if not text:
-        raise LLMResponseError("LLM returned an empty stream")
-    if final_usage is None:
-        prompt_tokens = estimate_tokens(json.dumps(messages, ensure_ascii=False))
-        completion_tokens = estimate_tokens(text)
-        final_usage = UsageInfo(
+        raise LLMResponseError("Пустой результат распознавания речи")
+
+    # Whisper часто не отдаёт usage — считаем оценку по длине
+    usage = usage_from_payload(runtime, model, payload if "usage" in payload else {}, text)
+    if usage.total_tokens <= 0:
+        approx = estimate_tokens(text)
+        usage = UsageInfo(
             model=model,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=prompt_tokens + completion_tokens,
-            cost_rub=calc_cost(runtime, model, prompt_tokens, completion_tokens),
+            prompt_tokens=approx,
+            completion_tokens=0,
+            total_tokens=approx,
+            cost_rub=calc_cost(runtime, model, approx, 0),
         )
-    yield "", final_usage
+    return text, usage

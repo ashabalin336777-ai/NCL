@@ -2,6 +2,7 @@
 
 import { Loader2, Sparkles } from "lucide-react";
 
+import { CollapsibleBlock } from "@/components/training/collapsible-block";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Hint } from "@/types/training";
@@ -19,6 +20,9 @@ export function HintsPanel({
   disabled,
   onRequestHint,
 }: HintsPanelProps): React.JSX.Element {
+  const ordered = [...hints].reverse();
+  const latestId = ordered[0]?.id;
+
   return (
     <Card className="flex h-full flex-col">
       <CardHeader>
@@ -42,21 +46,24 @@ export function HintsPanel({
         </Button>
 
         <div className="flex-1 space-y-3 overflow-y-auto">
-          {hints.length === 0 ? (
+          {ordered.length === 0 ? (
             <p className="text-sm text-slate-500">
               Нажмите кнопку, когда застряли: после возражения, перед презентацией или перед
               предложением BOM.
             </p>
           ) : (
-            [...hints].reverse().map((hint) => (
+            ordered.map((hint) => (
               <div
                 key={hint.id}
                 className="rounded-xl border border-orange-100 bg-accent-50 px-3 py-3 text-sm leading-6 text-slate-800"
               >
-                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-accent">
-                  Terra · {new Date(hint.created_at).toLocaleTimeString("ru-RU")}
-                </p>
-                <p className="whitespace-pre-wrap">{hint.response_text}</p>
+                <CollapsibleBlock
+                  title={`Terra · ${new Date(hint.created_at).toLocaleTimeString("ru-RU")}`}
+                  text={hint.response_text}
+                  defaultCollapsed={hint.id !== latestId}
+                  titleClassName="font-semibold text-accent opacity-100"
+                  collapseAfterChars={120}
+                />
               </div>
             ))
           )}

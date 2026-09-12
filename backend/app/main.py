@@ -7,11 +7,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.redis import close_redis
+from app.services.llm import close_llm_client
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     yield
+    await close_llm_client()
     await close_redis()
 
 

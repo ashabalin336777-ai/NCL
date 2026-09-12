@@ -81,13 +81,16 @@ export default function TrainingSessionPage(): React.JSX.Element {
         body: JSON.stringify({ content }),
       });
 
-      if (!response.ok || !response.body) {
-        // fallback to non-stream
+      const useFallback = async (): Promise<void> => {
         await apiFetch<Training>(`/trainings/${params.id}/messages`, {
           method: "POST",
           body: JSON.stringify({ content }),
         });
         await refreshTraining();
+      };
+
+      if (!response.ok || !response.body) {
+        await useFallback();
         return;
       }
 
@@ -95,6 +98,7 @@ export default function TrainingSessionPage(): React.JSX.Element {
       const decoder = new TextDecoder();
       let buffer = "";
       let assembled = "";
+      let sawDone = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -111,21 +115,56 @@ export default function TrainingSessionPage(): React.JSX.Element {
           if (!line) {
             continue;
           }
-          const payload = JSON.parse(line.slice(5).trim()) as {
-            delta?: string;
-            done?: boolean;
-          };
-          if (payload.delta) {
-            assembled += payload.delta;
-            setPendingAssistant(assembled);
+          try {
+            const payload = JSON.parse(line.slice(5).trim()) as {
+              delta?: string;
+              done?: boolean;
+              error?: string;
+            };
+            if (payload.error) {
+              throw new Error(payload.error);
+            }
+            if (payload.delta) {
+              assembled += payload.delta;
+              setPendingAssistant(assembled);
+            }
+            if (payload.done) {
+              sawDone = true;
+            }
+          } catch (parseError) {
+            if (parseError instanceof SyntaxError) {
+              continue;
+            }
+            throw parseError;
           }
         }
       }
 
+      if (!sawDone) {
+        await refreshTraining();
+        const fresh = queryClient.getQueryData<Training>(["training", params.id]);
+        const last = fresh?.messages.at(-1);
+        const prev = fresh?.messages.at(-2);
+        const alreadyOk =
+          last?.role === "assistant" &&
+          (prev?.content === content || Boolean(assembled.trim()));
+        if (!alreadyOk) {
+          await useFallback();
+        }
+        return;
+      }
+
       await refreshTraining();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Ошибка отправки сообщения");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Ошибка отправки сообщения. Нажмите «Отправить» ещё раз.",
+      );
       await refreshTraining();
+      throw err;
     } finally {
       setPendingAssistant("");
       setSending(false);
@@ -156,13 +195,13 @@ export default function TrainingSessionPage(): React.JSX.Element {
     mutationFn: async () =>
       apiFetch<TrainingCompleteResponse>(`/trainings/${params.id}/complete`, {
         method: "POST",
-        body: JSON.stringify({ run_analysis: true }),
+        body: JSON.stringify({ run_analysis: false }),
       }),
     onSuccess: async (data) => {
       queryClient.setQueryData(["training", params.id], data);
       await queryClient.invalidateQueries({ queryKey: ["trainings"] });
       await queryClient.invalidateQueries({ queryKey: ["stats", "me"] });
-      router.push(`/trainings/${params.id}/analysis`);
+      router.push(`/trainings/analysis/${params.id}`);
     },
     onError: (err: unknown) => {
       setError(err instanceof ApiError ? err.message : "Не удалось завершить тренировку");
@@ -210,7 +249,7 @@ export default function TrainingSessionPage(): React.JSX.Element {
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
             <Link
-              href={`/trainings/${training.id}/analysis`}
+              href={`/trainings/analysis/${training.id}`}
               className="inline-flex h-10 items-center rounded-lg bg-navy px-4 text-sm font-medium text-white"
             >
               Открыть анализ

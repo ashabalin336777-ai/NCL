@@ -4,6 +4,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.deps import CurrentUser, DbSession
@@ -30,7 +31,7 @@ from app.services.analysis import (
 )
 from app.services.llm import stream_text
 from app.services.neuraldeep_models import ALLOWED_MODELS
-from app.services.prompts import assemble_client_system
+from app.services.prompts import assemble_client_system, windowed_chat_messages
 from app.services.training import (
     add_cost,
     can_see_hidden_card,
@@ -43,13 +44,21 @@ from app.services.training import (
 router = APIRouter(prefix="/trainings", tags=["trainings"])
 
 
+def _loaded_analysis(training: Training) -> AnalysisPublic | None:
+    """Read analysis only if already eager-loaded (avoid async MissingGreenlet)."""
+    state = sa_inspect(training)
+    if "analysis" in state.unloaded:
+        return None
+    if training.analysis is None:
+        return None
+    return AnalysisPublic.model_validate(training.analysis)
+
+
 def _to_public(training: Training, user: User) -> TrainingPublic:
     card = None
     if training.client_profile is not None and can_see_hidden_card(user, training):
         card = HiddenClientCard.model_validate(training.client_profile.hidden_card_json)
-    analysis = None
-    if getattr(training, "analysis", None) is not None:
-        analysis = AnalysisPublic.model_validate(training.analysis)
+    analysis = _loaded_analysis(training)
     return TrainingPublic(
         id=training.id,
         difficulty=training.difficulty,
@@ -196,7 +205,8 @@ async def _stream_reply(
     user: User,
     user_text: str,
 ) -> AsyncIterator[str]:
-    from app.core.exceptions import ConflictError
+    from app.core.exceptions import ConflictError, LLMResponseError, LLMTimeoutError
+    from app.services.llm import complete_text
 
     if training.status not in {TrainingStatus.CREATED, TrainingStatus.IN_PROGRESS}:
         raise ConflictError("Training is already finished")
@@ -207,11 +217,9 @@ async def _stream_reply(
     card = HiddenClientCard.model_validate(training.client_profile.hidden_card_json)
     snapshot = training.context_snapshot_json or {}
     history: list[dict[str, str]] = [
-        {"role": "system", "content": assemble_client_system(snapshot, card)}
+        {"role": "system", "content": assemble_client_system(snapshot, card)},
+        *windowed_chat_messages(training.messages, user_text),
     ]
-    for item in training.messages:
-        history.append({"role": item.role.value, "content": item.content})
-    history.append({"role": "user", "content": user_text})
 
     user_message = Message(
         training_id=training.id,
@@ -225,23 +233,39 @@ async def _stream_reply(
 
     collected: list[str] = []
     usage: UsageInfo | None = None
-    async for delta, final_usage in stream_text(
-        runtime,
-        model=runtime.client_model_id,
-        messages=history,
-        temperature=0.75,
-        max_tokens=450,
-        session_key=f"ncl-client-{training.id}",
-    ):
-        if final_usage is not None:
-            usage = final_usage
-            break
-        collected.append(delta)
-        yield f"data: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
+    try:
+        async for delta, final_usage in stream_text(
+            runtime,
+            model=runtime.client_model_id,
+            messages=history,
+            temperature=0.75,
+            max_tokens=220,
+            max_retries=1,
+            session_key=f"ncl-client-{training.id}",
+        ):
+            if final_usage is not None:
+                usage = final_usage
+                break
+            collected.append(delta)
+            yield f"data: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
+    except (LLMResponseError, LLMTimeoutError, RuntimeError):
+        if collected:
+            raise
+        text, usage = await complete_text(
+            runtime,
+            model=runtime.client_model_id,
+            messages=history,
+            temperature=0.75,
+            max_tokens=220,
+            max_retries=1,
+            session_key=f"ncl-client-{training.id}",
+        )
+        collected = [text]
+        yield f"data: {json.dumps({'delta': text}, ensure_ascii=False)}\n\n"
 
     text = "".join(collected).strip()
-    if usage is None:
-        raise RuntimeError("Stream finished without usage")
+    if usage is None or not text:
+        raise LLMResponseError("Не удалось получить ответ клиента. Попробуйте ещё раз.")
     assistant = Message(
         training_id=training.id,
         role=MessageRole.ASSISTANT,

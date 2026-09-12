@@ -99,16 +99,16 @@ async def load_ai_settings(session: AsyncSession) -> AIRuntimeSettings:
         ),
         api_key=api_key,
         client_model_id=assert_neuraldeep_model(
-            _as_str(stored.get("client_model_id"), "qwen3.8-27b-noreason")
+            _as_str(stored.get("client_model_id"), "qwen3.6-fp8-noreason")
         ),
         card_model_id=assert_neuraldeep_model(
-            _as_str(stored.get("card_model_id"), "qwen3.8-27b-noreason")
+            _as_str(stored.get("card_model_id"), "qwen3.6-fp8-noreason")
         ),
         hint_model_id=assert_neuraldeep_model(
             _as_str(stored.get("hint_model_id"), "qwen3.6-fp8-noreason")
         ),
         analyst_model_id=assert_neuraldeep_model(
-            _as_str(stored.get("analyst_model_id"), "qwen3.8-27b")
+            _as_str(stored.get("analyst_model_id"), "qwen3.8-27b-noreason")
         ),
         timeout_seconds=_as_int(stored.get("llm_timeout_seconds"), settings.llm_timeout_seconds),
         max_retries=settings.llm_max_retries,

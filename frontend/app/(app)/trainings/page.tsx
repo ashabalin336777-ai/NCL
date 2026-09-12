@@ -43,7 +43,7 @@ export default function TrainingsPage(): React.JSX.Element {
               key={item.id}
               href={
                 item.status === "completed" || item.status === "aborted"
-                  ? `/trainings/${item.id}/analysis`
+                  ? `/trainings/analysis/${item.id}`
                   : `/trainings/${item.id}`
               }
               className="grid gap-2 rounded-xl border border-slate-200 px-4 py-3 transition hover:border-navy/30 hover:bg-navy-50 md:grid-cols-[1.4fr_1fr_auto]"

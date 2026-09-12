@@ -76,7 +76,7 @@ export async function apiFetch<T>(
   options: { auth?: boolean } = {},
 ): Promise<T> {
   const headers = new Headers(init.headers);
-  if (!headers.has("Content-Type") && init.body) {
+  if (!headers.has("Content-Type") && init.body && !(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -144,4 +144,14 @@ export async function logoutRequest(): Promise<void> {
 
 export async function fetchMe(): Promise<User> {
   return apiFetch<User>("/auth/me");
+}
+
+export async function transcribeSpeech(blob: Blob, filename = "speech.webm"): Promise<string> {
+  const form = new FormData();
+  form.append("file", blob, filename);
+  const result = await apiFetch<{ text: string }>("/speech/transcribe", {
+    method: "POST",
+    body: form,
+  });
+  return (result.text || "").trim();
 }

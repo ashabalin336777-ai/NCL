@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { apiFetch } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 import { CLIENT_ROLE_LABELS, DIFFICULTY_LABELS } from "@/lib/labels";
-import type { Training } from "@/types/training";
+import type { Analysis, Training } from "@/types/training";
 
 function Score({ label, value }: { label: string; value: number }): React.JSX.Element {
   return (
@@ -21,14 +23,42 @@ function Score({ label, value }: { label: string; value: number }): React.JSX.El
 
 export default function TrainingAnalysisPage(): React.JSX.Element {
   const params = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ["training", params.id],
     queryFn: () => apiFetch<Training>(`/trainings/${params.id}`),
     enabled: Boolean(params.id),
   });
 
+  const runAnalysis = useMutation({
+    mutationFn: () =>
+      apiFetch<Analysis>(`/trainings/${params.id}/analysis`, {
+        method: "POST",
+      }),
+    onSuccess: async (analysis) => {
+      queryClient.setQueryData<Training>(["training", params.id], (current) =>
+        current ? { ...current, analysis } : current,
+      );
+      await queryClient.invalidateQueries({ queryKey: ["training", params.id] });
+      await queryClient.invalidateQueries({ queryKey: ["trainings"] });
+      await queryClient.invalidateQueries({ queryKey: ["stats", "me"] });
+    },
+  });
+
   const training = query.data;
   const analysis = training?.analysis;
+  const finished =
+    training?.status === "completed" || training?.status === "aborted";
+  const autoStarted = useRef(false);
+
+  useEffect(() => {
+    if (!finished || analysis || autoStarted.current) {
+      return;
+    }
+    autoStarted.current = true;
+    runAnalysis.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finished, analysis, params.id]);
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
@@ -59,9 +89,35 @@ export default function TrainingAnalysisPage(): React.JSX.Element {
           <CardHeader>
             <CardTitle>Анализ ещё не готов</CardTitle>
             <CardDescription>
-              Завершите тренировку кнопкой «Завершить и разобрать», чтобы Sol выставил оценки.
+              {runAnalysis.isPending
+                ? "Sol разбирает сессию. Это обычно 12–25 секунд."
+                : finished
+                  ? "Сессия завершена. Sol ещё не выставил оценки — запустите разбор."
+                  : "Завершите тренировку кнопкой «Завершить и разобрать»."}
             </CardDescription>
           </CardHeader>
+          {finished ? (
+            <CardContent className="space-y-3">
+              {runAnalysis.isError ? (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  {runAnalysis.error instanceof ApiError
+                    ? runAnalysis.error.message
+                    : "Не удалось запустить анализ"}
+                </p>
+              ) : null}
+              <Button
+                disabled={runAnalysis.isPending}
+                onClick={() => runAnalysis.mutate()}
+              >
+                {runAnalysis.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                {runAnalysis.isPending ? "Sol разбирает…" : "Запустить разбор Sol"}
+              </Button>
+            </CardContent>
+          ) : null}
         </Card>
       ) : (
         <>

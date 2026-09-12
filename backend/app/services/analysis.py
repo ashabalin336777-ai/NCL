@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
+import json
+import logging
 
 from sqlalchemy import Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +19,7 @@ from app.schemas.ai import HiddenClientCard, UsageInfo
 from app.schemas.analysis import AnalysisResultDraft
 from app.services.ai_settings import load_ai_settings
 from app.services.llm import complete_structured
-from app.services.prompts import format_knowledge, load_active_prompt
+from app.services.prompts import format_knowledge_bullets, load_active_prompt
 from app.services.training import (
     _card_from_training,
     _load_options,
@@ -26,6 +28,8 @@ from app.services.training import (
     get_training_for_user,
     transcript,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _analysis_options() -> list:
@@ -55,16 +59,24 @@ async def get_training_with_analysis(
 
 def assemble_analyst_user_prompt(training: Training, card: HiddenClientCard) -> str:
     snapshot = training.context_snapshot_json or {}
-    kb = format_knowledge(snapshot.get("knowledge_base") or [])
+    kb = format_knowledge_bullets(snapshot.get("knowledge_base") or [])
+    card_brief = {
+        "company": card.company_name,
+        "role": card.role_title,
+        "industry": card.industry,
+        "product": card.product,
+        "hidden_pain": card.hidden_pain,
+        "next_step": card.next_step_if_convinced,
+    }
     return (
-        "Разбери тренировку менеджера B2B-продаж электронных компонентов.\n\n"
-        f"Скрытая карточка клиента:\n{card.model_dump_json()}\n\n"
-        f"Снимок базы знаний / комплаенса:\n{kb}\n\n"
+        "Разбери диалог менеджера. НЕ генерируй карточку клиента.\n\n"
+        f"Карточка:\n{json.dumps(card_brief, ensure_ascii=False)}\n\n"
+        f"Комплаенс:\n{kb}\n\n"
         f"Диалог:\n{transcript(training)}\n\n"
-        "Верни JSON строго с ключами: overall_score, needs_score, presentation_score, "
-        "objections_score, summary (text + outcome), strengths, improvements, "
+        "Один JSON: overall_score, needs_score, presentation_score, objections_score, "
+        "summary (text + outcome), strengths, improvements, "
         "criteria_comments (needs, presentation, close). "
-        "outcome один из: next_step_agreed, polite_reject, hard_reject, abandoned."
+        "Баллы 0–10. outcome: next_step_agreed|polite_reject|hard_reject|abandoned."
     )
 
 
@@ -90,7 +102,7 @@ async def run_sol_analysis(
         ],
         schema=AnalysisResultDraft,
         temperature=0.2,
-        max_tokens=1800,
+        max_tokens=900,
         session_key=f"ncl-sol-{training.id}",
     )
 
@@ -142,8 +154,14 @@ async def complete_training(
     await session.commit()
 
     if run_analysis and not aborted:
-        training = await get_training_with_analysis(session, training.id, user)
-        analysis, usage = await run_sol_analysis(session, training)
+        try:
+            training = await get_training_with_analysis(session, training.id, user)
+            analysis, usage = await run_sol_analysis(session, training)
+        except Exception as exc:  # noqa: BLE001 — сессия уже завершена; разбор можно повторить
+            logger.exception("Sol analysis failed for training %s: %s", training.id, exc)
+            await session.rollback()
+            analysis = None
+            usage = None
 
     training = await get_training_with_analysis(session, training.id, user)
     return training, analysis, usage

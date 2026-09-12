@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     llm_base_url: str = "https://api.neuraldeep.ru/v1"
     llm_api_key: str = ""
-    llm_timeout_seconds: int = 90
+    llm_timeout_seconds: int = 120
     llm_max_retries: int = 2
 
     seed_admin_email: str = "admin@ncl.local"

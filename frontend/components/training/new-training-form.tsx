@@ -80,12 +80,13 @@ export function NewTrainingForm(): React.JSX.Element {
               ))}
             </select>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="industry">Отрасль</Label>
+          <div className="space-y-2 md:col-span-3">
+            <Label htmlFor="industry">Отрасль ({INDUSTRIES.length})</Label>
             <select
               id="industry"
-              className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+              className="flex min-h-48 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
               value={industry}
+              size={Math.min(INDUSTRIES.length, 10)}
               onChange={(event) => setIndustry(event.target.value)}
             >
               {INDUSTRIES.map((item) => (
@@ -94,6 +95,7 @@ export function NewTrainingForm(): React.JSX.Element {
                 </option>
               ))}
             </select>
+            <p className="text-xs text-slate-500">Выбрано: {industry}</p>
           </div>
           {error ? (
             <p className="md:col-span-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">

@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Query
+from sqlalchemy import inspect as sa_inspect
 
 from app.api.v1.deps import CurrentAdmin, CurrentUser, DbSession
 from app.models.enums import TrainingStatus
@@ -44,7 +45,8 @@ def training_to_public(training, user: User) -> TrainingPublic:
     if training.client_profile is not None and can_see_hidden_card(user, training):
         card = HiddenClientCard.model_validate(training.client_profile.hidden_card_json)
     analysis = None
-    if getattr(training, "analysis", None) is not None:
+    state = sa_inspect(training)
+    if "analysis" not in state.unloaded and training.analysis is not None:
         analysis = AnalysisPublic.model_validate(training.analysis)
     return TrainingPublic(
         id=training.id,

@@ -82,7 +82,11 @@ export default function DashboardPage(): React.JSX.Element {
               trainingsQuery.data?.map((item) => (
                 <Link
                   key={item.id}
-                  href={`/trainings/${item.id}`}
+                  href={
+                    item.status === "completed" || item.status === "aborted"
+                      ? `/trainings/analysis/${item.id}`
+                      : `/trainings/${item.id}`
+                  }
                   className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 transition hover:border-navy/30 hover:bg-navy-50"
                 >
                   <div>

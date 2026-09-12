@@ -5,7 +5,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.exceptions import ConflictError, ForbiddenError, NotFoundError
+from app.core.exceptions import (
+    ConflictError,
+    ForbiddenError,
+    LLMResponseError,
+    LLMTimeoutError,
+    NotFoundError,
+)
 from app.models.client_profile import ClientProfile
 from app.models.enums import MessageRole, TrainingStatus, UserRole
 from app.models.hint import Hint
@@ -23,6 +29,8 @@ from app.services.prompts import (
     build_context_snapshot,
     load_active_prompt,
     load_knowledge_articles,
+    windowed_chat_messages,
+    windowed_transcript,
 )
 
 
@@ -31,6 +39,7 @@ def _load_options() -> list:
         selectinload(Training.messages),
         selectinload(Training.hints),
         selectinload(Training.client_profile),
+        selectinload(Training.analysis),
     ]
 
 
@@ -71,6 +80,27 @@ def transcript(training: Training) -> str:
     return "\n".join(lines) if lines else "Диалог ещё не начался."
 
 
+def _fallback_card_draft(payload: TrainingCreateRequest) -> HiddenClientCardDraft:
+    industry = payload.resolved_industry() or "Промышленная автоматизация"
+    return HiddenClientCardDraft(
+        company_name=f"НПО «Сигнал» ({industry})",
+        contact_name="Андрей Морозов",
+        role_title="Снабженец",
+        industry=industry,
+        product="Плата управления и электронные компоненты серийной линейки",
+        hidden_pain=(
+            "Текущий поставщик срывает сроки и есть риск контрафакта после смены канала. "
+            "Боимся остановки линии и штрафов по контракту."
+        ),
+        surface_request="Смотрим варианты по микросхемам и пассивке, нужен резервный канал.",
+        previous_experience="Работали с одним дистрибьютором и точечно брали с рынка.",
+        initial_stance="Скептичен, но готов слушать, если снимут риск по срокам и качеству.",
+        trust_triggers=["ОТК и входной контроль", "склад в РФ", "прямые контракты"],
+        planned_objections=["У нас уже есть рамочник", "Ваши цены выше рынка"],
+        next_step_if_convinced="Отправить BOM на бесплатный просчет",
+    )
+
+
 def _card_from_training(training: Training) -> HiddenClientCard:
     if training.client_profile is None:
         raise ConflictError("Client card is not generated yet")
@@ -100,25 +130,36 @@ async def create_training_with_card(
     session.add(training)
     await session.flush()
 
-    draft, card_usage = await complete_structured(
-        runtime,
-        model=runtime.card_model_id,
-        messages=[
-            {"role": "system", "content": card_prompt.system_prompt_text},
-            {
-                "role": "user",
-                "content": assemble_card_user_prompt(
-                    difficulty=payload.difficulty,
-                    client_role=payload.client_role,
-                    industry=payload.resolved_industry(),
-                ),
-            },
-        ],
-        schema=HiddenClientCardDraft,
-        temperature=0.7,
-        max_tokens=1800,
-        session_key=f"ncl-card-{training.id}",
-    )
+    try:
+        draft, card_usage = await complete_structured(
+            runtime,
+            model=runtime.card_model_id,
+            messages=[
+                {"role": "system", "content": card_prompt.system_prompt_text},
+                {
+                    "role": "user",
+                    "content": assemble_card_user_prompt(
+                        difficulty=payload.difficulty,
+                        client_role=payload.client_role,
+                        industry=payload.resolved_industry(),
+                    ),
+                },
+            ],
+            schema=HiddenClientCardDraft,
+            temperature=0.7,
+            max_tokens=700,
+            max_retries=1,
+            session_key=f"ncl-card-{training.id}",
+        )
+    except (LLMTimeoutError, LLMResponseError):
+        draft = _fallback_card_draft(payload)
+        card_usage = UsageInfo(
+            model="fallback",
+            prompt_tokens=0,
+            completion_tokens=0,
+            total_tokens=0,
+            cost_rub=Decimal("0"),
+        )
     card = HiddenClientCard(
         **draft.model_dump(),
         difficulty=payload.difficulty,
@@ -133,24 +174,38 @@ async def create_training_with_card(
     )
     add_cost(training, card_usage.cost_rub)
 
-    opening, opening_usage = await complete_text(
-        runtime,
-        model=runtime.client_model_id,
-        messages=[
-            {"role": "system", "content": assemble_client_system(snapshot, card)},
-            {
-                "role": "user",
-                "content": (
-                    "Начни диалог одной короткой репликой клиента. "
-                    "Ты сам вышел на связь или отвечаешь на холодный контакт. "
-                    "Не раскрывай скрытую боль. Без кавычек и пояснений."
-                ),
-            },
-        ],
-        temperature=0.8,
-        max_tokens=220,
-        session_key=f"ncl-client-{training.id}",
-    )
+    try:
+        opening, opening_usage = await complete_text(
+            runtime,
+            model=runtime.client_model_id,
+            messages=[
+                {"role": "system", "content": assemble_client_system(snapshot, card)},
+                {
+                    "role": "user",
+                    "content": (
+                        "Начни диалог одной короткой репликой клиента. "
+                        "Ты сам вышел на связь или отвечаешь на холодный контакт. "
+                        "Не раскрывай скрытую боль. Без кавычек и пояснений."
+                    ),
+                },
+            ],
+            temperature=0.8,
+            max_tokens=220,
+            max_retries=1,
+            session_key=f"ncl-client-{training.id}",
+        )
+    except (LLMTimeoutError, LLMResponseError):
+        opening = (
+            "Добрый день. Это по поставкам электронных компонентов — "
+            "есть вопрос по текущим закупкам, удобно пару минут?"
+        )
+        opening_usage = UsageInfo(
+            model="fallback",
+            prompt_tokens=0,
+            completion_tokens=0,
+            total_tokens=0,
+            cost_rub=Decimal("0"),
+        )
     session.add(
         Message(
             training_id=training.id,
@@ -191,11 +246,9 @@ async def reply_as_client(
     card = _card_from_training(training)
     snapshot = training.context_snapshot_json or {}
     history: list[ChatMessage] = [
-        {"role": "system", "content": assemble_client_system(snapshot, card)}
+        {"role": "system", "content": assemble_client_system(snapshot, card)},
+        *windowed_chat_messages(training.messages, user_text),
     ]
-    for item in training.messages:
-        history.append({"role": item.role.value, "content": item.content})
-    history.append({"role": "user", "content": user_text})
 
     user_message = Message(
         training_id=training.id,
@@ -212,7 +265,8 @@ async def reply_as_client(
         model=runtime.client_model_id,
         messages=history,
         temperature=0.75,
-        max_tokens=450,
+        max_tokens=220,
+        max_retries=1,
         session_key=f"ncl-client-{training.id}",
     )
     assistant_message = Message(
@@ -242,13 +296,16 @@ async def create_hint(session: AsyncSession, training: Training) -> tuple[Hint, 
     }
     card = _card_from_training(training)
     last_message_id = training.messages[-1].id if training.messages else None
-    user_prompt = assemble_hint_messages(snapshot, card, transcript(training))[1]["content"]
+    dialog = windowed_transcript(training.messages)
+    hint_messages = assemble_hint_messages(snapshot, card, dialog)
+    user_prompt = hint_messages[1]["content"]
     reply, usage = await complete_text(
         runtime,
         model=runtime.hint_model_id,
-        messages=assemble_hint_messages(snapshot, card, transcript(training)),
+        messages=hint_messages,
         temperature=0.4,
-        max_tokens=420,
+        max_tokens=280,
+        max_retries=1,
         session_key=f"ncl-terra-{training.id}",
     )
     hint = Hint(

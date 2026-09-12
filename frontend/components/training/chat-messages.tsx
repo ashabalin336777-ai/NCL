@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 
+import { CollapsibleBlock } from "@/components/training/collapsible-block";
 import { cn } from "@/lib/utils";
 import type { Message } from "@/types/training";
 
@@ -17,34 +18,43 @@ export function ChatMessages({
   sending,
 }: ChatMessagesProps): React.JSX.Element {
   const endRef = useRef<HTMLDivElement | null>(null);
+  const lastId = messages.at(-1)?.id;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, pendingAssistant, sending]);
+  }, [messages.length, pendingAssistant, sending]);
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4">
-      {messages.map((message) => (
-        <div
-          key={message.id}
-          className={cn(
-            "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6",
-            message.role === "user"
-              ? "ml-auto bg-navy text-white"
-              : "mr-auto border border-slate-200 bg-slate-50 text-slate-800",
-          )}
-        >
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide opacity-70">
-            {message.role === "user" ? "Вы" : "Клиент"}
-          </p>
-          <p className="whitespace-pre-wrap">{message.content}</p>
-        </div>
-      ))}
+      {messages.map((message) => {
+        const isLatest = message.id === lastId && !pendingAssistant;
+        return (
+          <div
+            key={message.id}
+            className={cn(
+              "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6",
+              message.role === "user"
+                ? "ml-auto bg-navy text-white"
+                : "mr-auto border border-slate-200 bg-slate-50 text-slate-800",
+            )}
+          >
+            <CollapsibleBlock
+              title={message.role === "user" ? "Вы" : "Клиент"}
+              text={message.content}
+              defaultCollapsed={!isLatest}
+              titleClassName={message.role === "user" ? "text-white/80" : undefined}
+              bodyClassName={message.role === "user" ? "text-white" : undefined}
+              toggleClassName={
+                message.role === "user" ? "text-white/90 hover:bg-white/10" : "hover:bg-black/5"
+              }
+            />
+          </div>
+        );
+      })}
 
       {pendingAssistant ? (
         <div className="mr-auto max-w-[85%] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800">
-          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide opacity-70">Клиент</p>
-          <p className="whitespace-pre-wrap">{pendingAssistant}</p>
+          <CollapsibleBlock title="Клиент" text={pendingAssistant} defaultCollapsed={false} />
         </div>
       ) : null}
 

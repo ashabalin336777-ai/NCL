@@ -1,13 +1,35 @@
-from typing import Any
+import json
+from typing import Any, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.labels import CLIENT_ROLE_LABELS, DIFFICULTY_LABELS
-from app.models.enums import ClientRole, Difficulty
+from app.domain.labels import CLIENT_ROLE_LABELS, DIFFICULTY_LABELS, INDUSTRIES
+from app.models.enums import ClientRole, Difficulty, MessageRole
 from app.models.knowledge_base import KnowledgeBase
+from app.models.message import Message
 from app.models.prompt import Prompt
 from app.schemas.ai import HiddenClientCard
+
+HISTORY_WINDOW = 10
+
+CLIENT_RUNTIME_RULES = """Ты — AI-клиент завода или КБ в РФ. Отвечай только репликой клиента (1–4 предложения), без мета-комментариев и скобок.
+Правила:
+1. Не раскрывай скрытую боль сразу. Давай зацепки, если менеджер компетентен.
+2. Шаблоны и давление — закрывайся. Вопросы про ОТК, логистику, аналоги — оттепель.
+3. «Покупка» = следующий шаг: BOM, встреча с инженером, NDA. Не перевод денег.
+4. Не соглашайся из вежливости, если риски не сняты.
+5. Не подтверждай обещания вне комплаенса."""
+
+COMPLIANCE_FALLBACK = """- Не обещать поставку из Китая за 3 дня и 100% склад по всей номенклатуре.
+- Склад РФ — согласованный срок; Азия + ВЭД — недели, не дни.
+- Сильные аргументы: ОТК, прямые контракты, буферный склад в РФ, аналоги без переделки платы.
+- Следующий шаг: BOM на просчет, встреча с инженером, NDA, опытная партия.
+- «Отправьте КП» без спецификации — вежливый отказ, его нужно отработать.
+- Не давить сроком или ценой."""
+
+HINT_RUNTIME_RULES = """Ты Terra — короткий совет менеджеру (4–6 предложений). Не пиши скрипт слово в слово.
+Веди к боли → презентации → следующему шагу (BOM / встреча / NDA). Не советуй обещать то, чего нет в комплаенсе."""
 
 
 async def load_active_prompt(session: AsyncSession, name: str) -> Prompt:
@@ -35,6 +57,44 @@ def format_knowledge(articles: list[dict[str, str]]) -> str:
     return "\n\n".join(blocks)
 
 
+def format_knowledge_bullets(articles: list[dict[str, str]] | None, limit: int = 8) -> str:
+    if not articles:
+        return COMPLIANCE_FALLBACK
+    lines: list[str] = []
+    for item in articles:
+        title = str(item.get("title") or "").strip()
+        content = str(item.get("content") or "").replace("\r", "").strip()
+        first = next((part.strip() for part in content.split("\n") if part.strip()), "")
+        if len(first) > 180:
+            first = first[:177].rstrip() + "…"
+        if title and first:
+            lines.append(f"- {title}: {first}")
+        elif first:
+            lines.append(f"- {first}")
+        if len(lines) >= limit:
+            break
+    return "\n".join(lines) if lines else COMPLIANCE_FALLBACK
+
+
+def compact_card(card: HiddenClientCard) -> str:
+    return json.dumps(
+        {
+            "company": card.company_name,
+            "contact": card.contact_name,
+            "role": card.role_title,
+            "industry": card.industry,
+            "product": card.product,
+            "hidden_pain": card.hidden_pain,
+            "surface": card.surface_request,
+            "stance": card.initial_stance,
+            "trust": card.trust_triggers,
+            "objections": card.planned_objections,
+            "next_step": card.next_step_if_convinced,
+        },
+        ensure_ascii=False,
+    )
+
+
 def build_context_snapshot(
     prompt: Prompt,
     articles: list[dict[str, str]],
@@ -48,14 +108,11 @@ def build_context_snapshot(
 
 
 def assemble_client_system(snapshot: dict[str, Any], card: HiddenClientCard) -> str:
-    kb = format_knowledge(snapshot.get("knowledge_base") or [])
-    prompt_text = str(snapshot.get("prompt_text") or "")
+    bullets = format_knowledge_bullets(snapshot.get("knowledge_base") or [])
     return (
-        f"{prompt_text}\n\n"
-        f"# Скрытая карточка этой тренировки\n"
-        f"{card.model_dump_json(indent=2)}\n\n"
-        f"# Снимок базы знаний (нельзя обещать то, чего здесь нет)\n"
-        f"{kb}\n"
+        f"{CLIENT_RUNTIME_RULES}\n\n"
+        f"# Комплаенс\n{bullets}\n\n"
+        f"# Карточка\n{compact_card(card)}\n"
     )
 
 
@@ -65,22 +122,66 @@ def assemble_card_user_prompt(
     client_role: ClientRole,
     industry: str | None,
 ) -> str:
-    industry_line = industry or "выбери одну из: " + ", ".join(
-        ["Медицина", "IoT", "Промышленная автоматизация", "ВПК", "Бытовая электроника"]
-    )
+    industry_line = industry or "выбери одну из: " + ", ".join(INDUSTRIES)
     return (
-        "Сгенерируй скрытую карточку реалистичного B2B-клиента — завод или КБ в РФ, "
-        "закупка электронных компонентов.\n"
+        "Сгенерируй скрытую карточку реалистичного B2B-клиента — завод или КБ в РФ.\n"
         f"Роль: {CLIENT_ROLE_LABELS[client_role]} ({client_role.value})\n"
         f"Сложность: {DIFFICULTY_LABELS[difficulty]} ({difficulty.value})\n"
         f"Отрасль: {industry_line}\n"
-        "Верни JSON строго с этими ключами:\n"
-        "company_name, contact_name, role_title, industry, product, hidden_pain, "
-        "surface_request, previous_experience, initial_stance, trust_triggers, "
-        "planned_objections, next_step_if_convinced.\n"
-        "trust_triggers и planned_objections — массивы из 2–6 коротких строк. "
-        "Карточка конкретная. Не пиши ничего кроме JSON."
+        "Только JSON с ключами: company_name, contact_name, role_title, industry, product, "
+        "hidden_pain, surface_request, previous_experience, initial_stance, trust_triggers, "
+        "planned_objections, next_step_if_convinced. "
+        "trust_triggers и planned_objections — 2–6 коротких строк."
     )
+
+
+def _clip(text: str, limit: int = 140) -> str:
+    clean = " ".join(text.split())
+    if len(clean) <= limit:
+        return clean
+    return clean[: limit - 1].rstrip() + "…"
+
+
+def summarize_older_messages(messages: Sequence[Message]) -> str:
+    lines: list[str] = []
+    for item in messages[:12]:
+        speaker = "Менеджер" if item.role == MessageRole.USER else "Клиент"
+        lines.append(f"- {speaker}: {_clip(item.content)}")
+    return "Краткое начало диалога:\n" + "\n".join(lines)
+
+
+def windowed_chat_messages(
+    messages: Sequence[Message],
+    user_text: str | None = None,
+    *,
+    window: int = HISTORY_WINDOW,
+) -> list[dict[str, str]]:
+    older = list(messages[:-window]) if len(messages) > window else []
+    recent = list(messages[-window:]) if messages else []
+    history: list[dict[str, str]] = []
+    if older:
+        history.append({"role": "user", "content": summarize_older_messages(older)})
+        history.append({"role": "assistant", "content": "Контекст принят, продолжаем текущий разговор."})
+    for item in recent:
+        history.append({"role": item.role.value, "content": item.content})
+    if user_text:
+        history.append({"role": "user", "content": user_text})
+    return history
+
+
+def windowed_transcript(messages: Sequence[Message], *, window: int = HISTORY_WINDOW) -> str:
+    if not messages:
+        return "Диалог ещё не начался."
+    older = list(messages[:-window]) if len(messages) > window else []
+    recent = list(messages[-window:]) if messages else []
+    parts: list[str] = []
+    if older:
+        parts.append(summarize_older_messages(older))
+        parts.append("Последние реплики:")
+    for item in recent:
+        speaker = "Менеджер" if item.role == MessageRole.USER else "Клиент"
+        parts.append(f"{speaker}: {item.content}")
+    return "\n".join(parts)
 
 
 def assemble_hint_messages(
@@ -88,20 +189,16 @@ def assemble_hint_messages(
     card: HiddenClientCard,
     transcript: str,
 ) -> list[dict[str, str]]:
+    bullets = format_knowledge_bullets(snapshot.get("knowledge_base") or [])
     return [
-        {
-            "role": "system",
-            "content": str(snapshot.get("prompt_text") or ""),
-        },
+        {"role": "system", "content": HINT_RUNTIME_RULES},
         {
             "role": "user",
             "content": (
-                "Скрытая карточка клиента (менеджер её не видит, ты используешь только "
-                "чтобы понять, куда вести разговор):\n"
-                f"{card.model_dump_json()}\n\n"
-                f"Снимок базы знаний:\n{format_knowledge(snapshot.get('knowledge_base') or [])}\n\n"
-                f"Текущий диалог:\n{transcript}\n\n"
-                "Дай короткий совет Terra: что спросить или предложить следующим сообщением."
+                f"Карточка:\n{compact_card(card)}\n\n"
+                f"Комплаенс:\n{bullets}\n\n"
+                f"Диалог:\n{transcript}\n\n"
+                "Что спросить или предложить следующим сообщением?"
             ),
         },
     ]
