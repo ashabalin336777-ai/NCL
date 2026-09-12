@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --navy: #1e3a8a;
+  --accent: #f97316;
+}
+
+* {
+  border-color: theme("colors.border");
+}
+
+body {
+  @apply min-h-screen bg-background font-sans text-foreground antialiased;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
