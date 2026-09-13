@@ -8,19 +8,27 @@
 
 ---
 
+## Роли
+
+| Роль | Кому | Что доступно |
+| --- | --- | --- |
+| **Менеджер** | Сейлзы заказчика | Тренировки, Terra, радар, Sol, личный дашборд |
+| **РОП** (`admin`) | Руководитель отдела продаж | Команда менеджеров, аналитика, отчёты CSV |
+| **Разработчик** (`developer`) | Владелец продукта / вы | Баланс проекта, AI-настройки, тарифы ₽, промпты, KB, все пользователи |
+
+Баланс проекта единый на инстанс. Списания за карточку клиента, реплики диалога, Terra, радар и Sol. Пополнение вручную в `/dev/billing` (ЮKassa — следующий этап).
+
+---
+
 ## Возможности
 
-| Для менеджера | Для РОПа |
-| --- | --- |
-| Тренировки с AI-клиентом по отрасли и роли | Команда, база знаний, AI-настройки |
-| Подсказки **Terra** в реальном времени | Просмотр тренировок команды |
-| Голос → текст (Whisper через NeuralDEEP) | Статистика менеджеров |
-| **Радар 6 компетенций** после каждой реплики | Модели чата / Terra / Sol / радара |
-| Разбор **Sol**: оценки, резюме, зоны роста | Итоговый радар и скрытая карточка после сессии |
-
-**Радар компетенций:** выявление боли, презентация, возражения, закрытие, техника, риски (0–100%, накопительно 70/30). Счётчики: свои реплики / запросы подсказок.
-
-В диалоге клиент представляется **по сгенерированной карточке** (ФИО + компания). Скрытая боль открывается только после завершения сессии.
+| Для менеджера | Для РОПа | Для разработчика |
+| --- | --- | --- |
+| Тренировки с AI-клиентом | Аналитика команды + график | Баланс и ledger |
+| Подсказки **Terra** | CRUD менеджеров | Модели и тарифы ₽ |
+| Голос → текст | Отчёт CSV руководству | Промпты (версии) |
+| **Радар 6 компетенций** | Разбор чужих сессий | База знаний |
+| Разбор **Sol** | | Пользователи любых ролей |
 
 ---
 
@@ -42,8 +50,11 @@ UI: **http://localhost:8080**
 
 | Роль | Email | Пароль |
 | --- | --- | --- |
+| Разработчик | `dev@ncl.local` | `ChangeMe_Dev_123` (или `SEED_DEVELOPER_PASSWORD`) |
 | РОП | `admin@ncl.local` | `ChangeMe_Admin_123` (или `SEED_ADMIN_PASSWORD`) |
 | Менеджер | `manager1@ncl.local` … `manager3@ncl.local` | `ChangeMe_Manager_123` (или `SEED_MANAGER_PASSWORD`) |
+
+Seed также создаёт баланс проекта (`SEED_BILLING_BALANCE_RUB`, по умолчанию 5000 ₽).
 
 ---
 
@@ -57,7 +68,7 @@ UI: **http://localhost:8080**
 | Радар реплики | `radar_model_id` | `qwen3.6-fp8-noreason` |
 | Sol (разбор) | `analyst_model_id` | `qwen3.8-27b-noreason` |
 
-Модели и тарифы правятся в админке `/admin/settings`. Обработка в РФ (152-ФЗ).
+Модели и тарифы: `/dev/settings`. Промпты: `/dev/prompts`.
 
 ---
 
@@ -65,24 +76,20 @@ UI: **http://localhost:8080**
 
 **Auth:** `POST /api/v1/auth/login|refresh|logout`, `GET /api/v1/auth/me`
 
-**Тренировки:**
-- `GET/POST /api/v1/trainings`
-- `GET /api/v1/trainings/{id}` — в т.ч. `client_brief`, `client_label`, `radar_scores`
-- `POST .../messages`, `.../messages/stream`
-- `POST .../hints`, `.../analyze-message`, `.../complete`, `.../abort`, `.../analysis`
-- `POST /api/v1/speech/transcribe`
+**Тренировки:** `GET/POST /trainings`, messages, hints, analyze-message, complete, analysis, speech
 
-**РОП:** `/api/v1/admin/users|knowledge|prompts|settings|trainings`, `/api/v1/stats/...`
+**РОП:** `/api/v1/rop/stats/team|series`, `/rop/stats/managers/{id}`, `/rop/trainings`, `/rop/reports/summary.csv`, `/rop/users`
+
+**Разработчик:** `/api/v1/dev/billing`, `/dev/billing/topup`, `/dev/billing/ledger`, `/dev/settings`, `/dev/prompts`, `/dev/knowledge`, `/dev/users`
 
 ---
 
 ## Этапы
 
-1. Инфраструктура Docker + auth  
-2. Карточка клиента + диалог NeuralDEEP  
-3. Админка РОПа (команда, KB, настройки)  
-4. UI менеджера (дашборд, история)  
-5. Чат, Terra, голос, Sol  
-5.5. **Real-time радар компетенций**, русские лейблы, счётчики реплик/подсказок  
+1–5.5 — инфра, диалог, Sol, радар  
+6 — аналитика РОПа (команда, динамика, CSV) — **готово**  
+7 — админка разработчика (AI, промпты, KB, баланс MVP) — **готово**  
+Далее — ЮKassa (онлайн-пополнение баланса)
 
-Презентация для заказчика: [PRESENTATION.md](PRESENTATION.md)
+Презентация для заказчика: [PRESENTATION.md](PRESENTATION.md)  
+Репозиторий: https://github.com/ashabalin336777-ai/NCL

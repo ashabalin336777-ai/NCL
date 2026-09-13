@@ -31,6 +31,11 @@ class RateLimitError(AppError):
         super().__init__(status.HTTP_429_TOO_MANY_REQUESTS, detail)
 
 
+class PaymentRequiredError(AppError):
+    def __init__(self, detail: str = "Project balance is insufficient") -> None:
+        super().__init__(status.HTTP_402_PAYMENT_REQUIRED, detail)
+
+
 class LLMUnavailableError(AppError):
     def __init__(self, detail: str = "LLM endpoint is not configured") -> None:
         super().__init__(status.HTTP_503_SERVICE_UNAVAILABLE, detail)

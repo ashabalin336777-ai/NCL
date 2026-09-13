@@ -1,5 +1,7 @@
 import asyncio
+from decimal import Decimal
 from typing import Any
+from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +19,7 @@ from app.db.seed_content import (
 )
 from app.services.ai_settings import DEFAULT_TARIFFS
 from app.models.ai_setting import AISetting
+from app.models.billing import BillingAccount
 from app.models.enums import UserRole
 from app.models.knowledge_base import KnowledgeBase
 from app.models.prompt import Prompt
@@ -34,6 +37,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "cost_per_1k_output_tokens_rub": 0.122,
     "llm_timeout_seconds": settings.llm_timeout_seconds,
     "model_tariffs": DEFAULT_TARIFFS,
+    "billing_min_reserve_rub": 5,
 }
 
 PLACEHOLDER_SETTINGS: dict[str, set[Any]] = {
@@ -115,8 +119,24 @@ async def _ensure_article(session: AsyncSession, title: str, content: str) -> No
     session.add(KnowledgeBase(title=title, content=content))
 
 
+async def _ensure_billing_account(session: AsyncSession, balance: Decimal) -> None:
+    result = await session.execute(select(BillingAccount).limit(1))
+    if result.scalar_one_or_none() is not None:
+        return
+    session.add(
+        BillingAccount(id=uuid4(), balance_rub=balance, currency="RUB")
+    )
+
+
 async def seed() -> None:
     async with SessionLocal() as session:
+        await _ensure_user(
+            session,
+            settings.seed_developer_email,
+            settings.seed_developer_password,
+            UserRole.DEVELOPER,
+            "Разработчик NCL",
+        )
         await _ensure_user(
             session,
             settings.seed_admin_email,
@@ -154,6 +174,10 @@ async def seed() -> None:
 
         for title, content in KNOWLEDGE_ARTICLES:
             await _ensure_article(session, title, content)
+
+        await _ensure_billing_account(
+            session, Decimal(str(settings.seed_billing_balance_rub))
+        )
 
         await session.commit()
         print("Seed completed")

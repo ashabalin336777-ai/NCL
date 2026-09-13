@@ -75,7 +75,7 @@ export default function TrainingsPage(): React.JSX.Element {
                     {item.industry ? `${item.industry} · ` : ""}
                     {new Date(item.created_at).toLocaleString("ru-RU")}
                   </p>
-                  {user?.role === "admin" && item.manager_name ? (
+                  {user && (user.role === "admin" || user.role === "developer") && item.manager_name ? (
                     <p className="text-xs text-slate-500">{item.manager_name}</p>
                   ) : null}
                 </div>

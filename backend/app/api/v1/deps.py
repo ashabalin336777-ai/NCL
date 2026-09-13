@@ -13,6 +13,7 @@ from app.core.security import decode_token
 from app.models.enums import UserRole
 from app.models.user import User
 from app.services.auth import get_user_by_id
+from app.services.training import is_staff
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -43,10 +44,29 @@ async def get_current_user(
 async def get_current_admin(
     user: Annotated[User, Depends(get_current_user)],
 ) -> User:
-    if user.role != UserRole.ADMIN:
+    """РОП (admin) или developer — операционные admin-эндпоинты команды."""
+    if not is_staff(user):
         raise ForbiddenError("Admin role required")
+    return user
+
+
+async def get_current_rop(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    if user.role not in {UserRole.ADMIN, UserRole.DEVELOPER}:
+        raise ForbiddenError("ROP role required")
+    return user
+
+
+async def get_current_developer(
+    user: Annotated[User, Depends(get_current_user)],
+) -> User:
+    if user.role != UserRole.DEVELOPER:
+        raise ForbiddenError("Developer role required")
     return user
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 CurrentAdmin = Annotated[User, Depends(get_current_admin)]
+CurrentRop = Annotated[User, Depends(get_current_rop)]
+CurrentDeveloper = Annotated[User, Depends(get_current_developer)]

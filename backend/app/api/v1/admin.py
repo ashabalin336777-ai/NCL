@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Query
 from sqlalchemy import inspect as sa_inspect
 
-from app.api.v1.deps import CurrentAdmin, CurrentUser, DbSession
+from app.api.v1.deps import CurrentAdmin, CurrentDeveloper, CurrentUser, DbSession
 from app.models.enums import TrainingStatus
 from app.models.user import User
 from app.schemas.admin import (
@@ -90,9 +90,9 @@ async def admin_list_users(session: DbSession, _admin: CurrentAdmin) -> list[Use
 async def admin_create_user(
     payload: UserCreateRequest,
     session: DbSession,
-    _admin: CurrentAdmin,
+    admin: CurrentAdmin,
 ) -> UserPublic:
-    user = await admin_service.create_user(session, payload)
+    user = await admin_service.create_user(session, payload, actor=admin)
     return UserPublic.model_validate(user)
 
 
@@ -101,16 +101,16 @@ async def admin_update_user(
     user_id: UUID,
     payload: UserUpdateRequest,
     session: DbSession,
-    _admin: CurrentAdmin,
+    admin: CurrentAdmin,
 ) -> UserPublic:
-    user = await admin_service.update_user(session, user_id, payload)
+    user = await admin_service.update_user(session, user_id, payload, actor=admin)
     return UserPublic.model_validate(user)
 
 
 @admin_router.get("/knowledge", response_model=list[KnowledgeArticlePublic])
 async def admin_list_knowledge(
     session: DbSession,
-    _admin: CurrentAdmin,
+    _admin: CurrentDeveloper,
 ) -> list[KnowledgeArticlePublic]:
     items = await admin_service.list_knowledge(session)
     return [KnowledgeArticlePublic.model_validate(item) for item in items]
@@ -120,7 +120,7 @@ async def admin_list_knowledge(
 async def admin_create_knowledge(
     payload: KnowledgeArticleCreate,
     session: DbSession,
-    _admin: CurrentAdmin,
+    _admin: CurrentDeveloper,
 ) -> KnowledgeArticlePublic:
     item = await admin_service.create_knowledge(session, payload)
     return KnowledgeArticlePublic.model_validate(item)
@@ -131,7 +131,7 @@ async def admin_update_knowledge(
     article_id: UUID,
     payload: KnowledgeArticleUpdate,
     session: DbSession,
-    _admin: CurrentAdmin,
+    _admin: CurrentDeveloper,
 ) -> KnowledgeArticlePublic:
     item = await admin_service.update_knowledge(session, article_id, payload)
     return KnowledgeArticlePublic.model_validate(item)
@@ -141,7 +141,7 @@ async def admin_update_knowledge(
 async def admin_delete_knowledge(
     article_id: UUID,
     session: DbSession,
-    _admin: CurrentAdmin,
+    _admin: CurrentDeveloper,
 ) -> APIMessage:
     await admin_service.delete_knowledge(session, article_id)
     return APIMessage(detail="Knowledge article deleted")
@@ -150,7 +150,7 @@ async def admin_delete_knowledge(
 @admin_router.get("/prompts", response_model=list[PromptPublic])
 async def admin_list_prompts(
     session: DbSession,
-    _admin: CurrentAdmin,
+    _admin: CurrentDeveloper,
     name: str | None = None,
 ) -> list[PromptPublic]:
     items = await admin_service.list_prompts(session, name=name)
@@ -161,7 +161,7 @@ async def admin_list_prompts(
 async def admin_create_prompt(
     payload: PromptCreateRequest,
     session: DbSession,
-    _admin: CurrentAdmin,
+    _admin: CurrentDeveloper,
 ) -> PromptPublic:
     item = await admin_service.create_prompt_version(session, payload)
     return PromptPublic.model_validate(item)
@@ -171,7 +171,7 @@ async def admin_create_prompt(
 async def admin_activate_prompt(
     prompt_id: UUID,
     session: DbSession,
-    _admin: CurrentAdmin,
+    _admin: CurrentDeveloper,
 ) -> PromptPublic:
     item = await admin_service.activate_prompt(session, prompt_id)
     return PromptPublic.model_validate(item)
@@ -180,7 +180,7 @@ async def admin_activate_prompt(
 @admin_router.get("/settings", response_model=list[AISettingPublic])
 async def admin_list_settings(
     session: DbSession,
-    _admin: CurrentAdmin,
+    _admin: CurrentDeveloper,
 ) -> list[AISettingPublic]:
     items = await admin_service.list_settings(session)
     return [AISettingPublic.model_validate(item) for item in items]
@@ -191,7 +191,7 @@ async def admin_upsert_setting(
     key: str,
     payload: AISettingUpsertRequest,
     session: DbSession,
-    _admin: CurrentAdmin,
+    _admin: CurrentDeveloper,
 ) -> AISettingPublic:
     item = await admin_service.upsert_setting(session, key, payload.value)
     return AISettingPublic.model_validate(item)
@@ -201,7 +201,7 @@ async def admin_upsert_setting(
 async def admin_bulk_settings(
     payload: AISettingsBulkUpdate,
     session: DbSession,
-    _admin: CurrentAdmin,
+    _admin: CurrentDeveloper,
 ) -> list[AISettingPublic]:
     items = await admin_service.bulk_upsert_settings(session, payload)
     return [AISettingPublic.model_validate(item) for item in items]

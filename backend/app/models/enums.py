@@ -3,7 +3,14 @@ from enum import StrEnum
 
 class UserRole(StrEnum):
     MANAGER = "manager"
-    ADMIN = "admin"
+    ADMIN = "admin"  # РОП
+    DEVELOPER = "developer"
+
+
+class BillingLedgerType(StrEnum):
+    TOPUP = "topup"
+    DEBIT = "debit"
+    ADJUSTMENT = "adjustment"
 
 
 class Difficulty(StrEnum):

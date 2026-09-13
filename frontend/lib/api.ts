@@ -112,6 +112,34 @@ export async function apiFetch<T>(
   return (await response.json()) as T;
 }
 
+export async function apiFetchBlob(
+  path: string,
+  init: RequestInit = {},
+): Promise<Blob> {
+  const headers = new Headers(init.headers);
+  const token = await ensureFreshToken();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+  let response = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  if (response.status === 401) {
+    if (!refreshPromise) {
+      refreshPromise = refreshAccessToken().finally(() => {
+        refreshPromise = null;
+      });
+    }
+    const nextToken = await refreshPromise;
+    if (nextToken) {
+      headers.set("Authorization", `Bearer ${nextToken}`);
+      response = await fetch(`${API_BASE}${path}`, { ...init, headers });
+    }
+  }
+  if (!response.ok) {
+    throw await parseError(response);
+  }
+  return response.blob();
+}
+
 export async function loginRequest(email: string, password: string): Promise<TokenResponse> {
   return apiFetch<TokenResponse>(
     "/auth/login",

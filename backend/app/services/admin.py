@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ConflictError, NotFoundError
 from app.core.security import hash_password
 from app.models.ai_setting import AISetting
+from app.models.enums import UserRole
 from app.models.knowledge_base import KnowledgeBase
 from app.models.prompt import Prompt
 from app.models.user import User
@@ -38,15 +39,28 @@ async def list_users(session: AsyncSession) -> list[User]:
     return list(result.scalars().all())
 
 
-async def create_user(session: AsyncSession, payload: UserCreateRequest) -> User:
+async def create_user(
+    session: AsyncSession,
+    payload: UserCreateRequest,
+    *,
+    actor: User | None = None,
+) -> User:
     existing = await session.execute(select(User).where(User.email == payload.email.lower()))
     if existing.scalar_one_or_none() is not None:
         raise ConflictError("User with this email already exists")
+    role = payload.role
+    if actor is not None and actor.role == UserRole.ADMIN:
+        # РОП может создавать только менеджеров
+        if role != UserRole.MANAGER:
+            from app.core.exceptions import ForbiddenError
+
+            raise ForbiddenError("ROP can only create manager accounts")
+        role = UserRole.MANAGER
     user = User(
         email=payload.email.lower(),
         hashed_password=hash_password(payload.password),
         full_name=payload.full_name,
-        role=payload.role,
+        role=role,
         is_active=payload.is_active,
     )
     session.add(user)
@@ -59,11 +73,22 @@ async def update_user(
     session: AsyncSession,
     user_id: UUID,
     payload: UserUpdateRequest,
+    *,
+    actor: User | None = None,
 ) -> User:
     result = await session.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if user is None:
         raise NotFoundError("User not found")
+    if actor is not None and actor.role == UserRole.ADMIN:
+        if user.role != UserRole.MANAGER:
+            from app.core.exceptions import ForbiddenError
+
+            raise ForbiddenError("ROP can only manage manager accounts")
+        if payload.role is not None and payload.role != UserRole.MANAGER:
+            from app.core.exceptions import ForbiddenError
+
+            raise ForbiddenError("ROP cannot change role away from manager")
     if payload.full_name is not None:
         user.full_name = payload.full_name
     if payload.role is not None:

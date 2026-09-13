@@ -27,6 +27,7 @@ from app.schemas.training import (
     TrainingCreateResponse,
     TrainingPublic,
 )
+from app.services import billing as billing_service
 from app.services.ai_settings import load_ai_settings
 from app.services.analysis import (
     complete_training,
@@ -250,6 +251,7 @@ async def _stream_reply(
     if training.client_profile is None:
         raise ConflictError("Client card is not generated yet")
 
+    await billing_service.ensure_balance(session)
     runtime = await load_ai_settings(session)
     card = HiddenClientCard.model_validate(training.client_profile.hidden_card_json)
     snapshot = training.context_snapshot_json or {}
@@ -311,7 +313,14 @@ async def _stream_reply(
         cost_rub=usage.cost_rub,
     )
     session.add(assistant)
-    add_cost(training, usage.cost_rub)
+    await add_cost(
+        session,
+        training,
+        usage.cost_rub,
+        reason="client_reply",
+        ref_type="message",
+        meta={"model": usage.model, "tokens": usage.total_tokens},
+    )
     training.status = TrainingStatus.IN_PROGRESS
     await session.commit()
     await session.refresh(assistant)

@@ -45,13 +45,23 @@ export default function DashboardPage(): React.JSX.Element {
             следующий шаг: BOM, встреча с инженером, NDA.
           </p>
         </div>
-          <Link
-            href="/trainings"
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-navy px-4 text-sm font-medium text-white hover:bg-navy-700"
-          >
-            Начать тренировку
-            <ArrowRight className="h-4 w-4" />
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/trainings"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-navy px-4 text-sm font-medium text-white hover:bg-navy-700"
+            >
+              Начать тренировку
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            {user?.role === "admin" || user?.role === "developer" ? (
+              <Link
+                href="/rop/analytics"
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-900 hover:bg-slate-50"
+              >
+                Аналитика команды
+              </Link>
+            ) : null}
+          </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">

@@ -21,6 +21,7 @@ from app.models.training import Training
 from app.models.user import User
 from app.schemas.ai import HiddenClientCard, HiddenClientCardDraft, UsageInfo
 from app.schemas.training import TrainingCreateRequest
+from app.services import billing as billing_service
 from app.services.ai_settings import load_ai_settings
 from app.services.llm import ChatMessage, complete_structured, complete_text
 from app.services.prompts import (
@@ -33,6 +34,10 @@ from app.services.prompts import (
     windowed_chat_messages,
     windowed_transcript,
 )
+
+
+def is_staff(user: User) -> bool:
+    return user.role in {UserRole.ADMIN, UserRole.DEVELOPER}
 
 
 def _load_options() -> list:
@@ -59,13 +64,13 @@ async def get_training_for_user(
     training = result.scalar_one_or_none()
     if training is None:
         raise NotFoundError("Training not found")
-    if user.role != UserRole.ADMIN and training.user_id != user.id:
+    if not is_staff(user) and training.user_id != user.id:
         raise ForbiddenError("Training belongs to another manager")
     return training
 
 
 def can_see_hidden_card(user: User, training: Training) -> bool:
-    if user.role == UserRole.ADMIN:
+    if is_staff(user):
         return True
     return training.status in {TrainingStatus.COMPLETED, TrainingStatus.ABORTED}
 
@@ -93,8 +98,28 @@ def client_chat_label(training: Training) -> str | None:
     return f"{brief['contact_name']}, {brief['company_name']}"
 
 
-def add_cost(training: Training, amount: Decimal) -> None:
-    training.total_cost_rub = Decimal(training.total_cost_rub) + amount
+async def add_cost(
+    session: AsyncSession,
+    training: Training,
+    amount: Decimal,
+    *,
+    reason: str,
+    ref_type: str | None = None,
+    ref_id: UUID | None = None,
+    meta: dict | None = None,
+) -> None:
+    value = Decimal(amount)
+    if value <= 0:
+        return
+    training.total_cost_rub = Decimal(training.total_cost_rub) + value
+    await billing_service.debit(
+        session,
+        amount_rub=value,
+        reason=reason,
+        ref_type=ref_type,
+        ref_id=ref_id or training.id,
+        meta=meta,
+    )
 
 
 def transcript(training: Training) -> str:
@@ -150,6 +175,7 @@ async def create_training_with_card(
     user: User,
     payload: TrainingCreateRequest,
 ) -> tuple[Training, UsageInfo]:
+    await billing_service.ensure_balance(session)
     runtime = await load_ai_settings(session)
     client_prompt = await load_active_prompt(session, "client")
     card_prompt = await load_active_prompt(session, "card_generator")
@@ -210,7 +236,15 @@ async def create_training_with_card(
             hidden_card_json=card.model_dump(mode="json"),
         )
     )
-    add_cost(training, card_usage.cost_rub)
+    await add_cost(
+        session,
+        training,
+        card_usage.cost_rub,
+        reason="client_card",
+        ref_type="training",
+        ref_id=training.id,
+        meta={"model": card_usage.model, "tokens": card_usage.total_tokens},
+    )
 
     try:
         opening, opening_usage = await complete_text(
@@ -256,7 +290,15 @@ async def create_training_with_card(
             cost_rub=opening_usage.cost_rub,
         )
     )
-    add_cost(training, opening_usage.cost_rub)
+    await add_cost(
+        session,
+        training,
+        opening_usage.cost_rub,
+        reason="client_opening",
+        ref_type="training",
+        ref_id=training.id,
+        meta={"model": opening_usage.model, "tokens": opening_usage.total_tokens},
+    )
     training.status = TrainingStatus.IN_PROGRESS
     await session.commit()
     training = await get_training_for_user(session, training.id, user)
@@ -283,6 +325,7 @@ async def reply_as_client(
     user_text: str,
 ) -> tuple[Message, Message, UsageInfo]:
     _require_active(training)
+    await billing_service.ensure_balance(session)
     runtime = await load_ai_settings(session)
     card = _card_from_training(training)
     snapshot = training.context_snapshot_json or {}
@@ -318,7 +361,14 @@ async def reply_as_client(
         cost_rub=usage.cost_rub,
     )
     session.add(assistant_message)
-    add_cost(training, usage.cost_rub)
+    await add_cost(
+        session,
+        training,
+        usage.cost_rub,
+        reason="client_reply",
+        ref_type="message",
+        meta={"model": usage.model, "tokens": usage.total_tokens},
+    )
     training.status = TrainingStatus.IN_PROGRESS
     await session.commit()
     await session.refresh(user_message)
@@ -328,6 +378,7 @@ async def reply_as_client(
 
 async def create_hint(session: AsyncSession, training: Training) -> tuple[Hint, UsageInfo]:
     _require_active(training)
+    await billing_service.ensure_balance(session)
     runtime = await load_ai_settings(session)
     hint_prompt = await load_active_prompt(session, "terra_hint")
     articles = (training.context_snapshot_json or {}).get("knowledge_base") or []
@@ -358,7 +409,14 @@ async def create_hint(session: AsyncSession, training: Training) -> tuple[Hint, 
         cost_rub=usage.cost_rub,
     )
     session.add(hint)
-    add_cost(training, usage.cost_rub)
+    await add_cost(
+        session,
+        training,
+        usage.cost_rub,
+        reason="terra_hint",
+        ref_type="hint",
+        meta={"model": usage.model, "tokens": usage.total_tokens},
+    )
     await session.commit()
     await session.refresh(hint)
     return hint, usage

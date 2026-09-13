@@ -116,3 +116,51 @@ class ManagerStats(BaseModel):
     average_objections_score: float | None
     total_cost_rub: Decimal
     outcomes: dict[str, int]
+    manager_id: UUID | None = None
+    manager_name: str | None = None
+    manager_email: str | None = None
+
+
+class TeamStats(BaseModel):
+    trainings_total: int
+    trainings_completed: int
+    completion_rate: float
+    average_overall_score: float | None
+    total_cost_rub: Decimal
+    outcomes: dict[str, int]
+    managers: list[ManagerStats]
+
+
+class StatsSeriesPoint(BaseModel):
+    period: str
+    trainings_count: int
+    average_overall_score: float | None
+    total_cost_rub: Decimal
+
+
+class BillingAccountPublic(BaseModel):
+    balance_rub: Decimal
+    currency: str
+    updated_at: datetime | None = None
+    min_reserve_rub: Decimal
+
+
+class BillingTopupRequest(BaseModel):
+    amount_rub: Decimal = Field(gt=0)
+    note: str | None = Field(default=None, max_length=500)
+
+
+class BillingLedgerPublic(ORMModel):
+    id: UUID
+    created_at: datetime
+    type: str
+    amount_rub: Decimal
+    balance_after: Decimal
+    reason: str
+    ref_type: str | None = None
+    ref_id: UUID | None = None
+    created_by: UUID | None = None
+    provider: str | None = None
+    external_payment_id: str | None = None
+    meta_json: dict[str, Any] | None = None
+    note: str | None = None

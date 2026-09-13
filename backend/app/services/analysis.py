@@ -15,9 +15,10 @@ from app.models.analysis import Analysis
 from app.models.enums import TrainingOutcome, TrainingStatus, UserRole
 from app.models.training import Training
 from app.models.user import User
-from app.schemas.admin import ManagerStats, TrainingListItem
+from app.schemas.admin import ManagerStats, StatsSeriesPoint, TeamStats, TrainingListItem
 from app.schemas.ai import HiddenClientCard, UsageInfo
 from app.schemas.analysis import AnalysisResultDraft
+from app.services import billing as billing_service
 from app.services.ai_settings import load_ai_settings
 from app.services.llm import complete_structured
 from app.services.prompts import format_knowledge_bullets, load_active_prompt
@@ -27,6 +28,7 @@ from app.services.training import (
     _require_active,
     add_cost,
     get_training_for_user,
+    is_staff,
     transcript,
 )
 
@@ -51,7 +53,7 @@ async def get_training_with_analysis(
     training = result.scalar_one_or_none()
     if training is None:
         raise NotFoundError("Training not found")
-    if user.role != UserRole.ADMIN and training.user_id != user.id:
+    if not is_staff(user) and training.user_id != user.id:
         from app.core.exceptions import ForbiddenError
 
         raise ForbiddenError("Training belongs to another manager")
@@ -90,6 +92,7 @@ async def run_sol_analysis(
     if not training.messages:
         raise ConflictError("Cannot analyse empty training")
 
+    await billing_service.ensure_balance(session)
     runtime = await load_ai_settings(session)
     analyst_prompt = await load_active_prompt(session, "sol_analyst")
     card = _card_from_training(training)
@@ -123,7 +126,14 @@ async def run_sol_analysis(
         cost_rub=usage.cost_rub,
     )
     session.add(analysis)
-    add_cost(training, usage.cost_rub)
+    await add_cost(
+        session,
+        training,
+        usage.cost_rub,
+        reason="sol_analysis",
+        ref_type="analysis",
+        meta={"model": usage.model, "tokens": usage.total_tokens},
+    )
 
     outcome_value = summary.get("outcome")
     try:
@@ -191,7 +201,7 @@ def _list_query(
         )
         .order_by(Training.created_at.desc())
     )
-    if user.role != UserRole.ADMIN:
+    if not is_staff(user):
         query = query.where(Training.user_id == user.id)
     elif manager_id is not None:
         query = query.where(Training.user_id == manager_id)
@@ -251,8 +261,8 @@ async def manager_stats(
     *,
     manager_id: UUID | None = None,
 ) -> ManagerStats:
-    target_id = manager_id if user.role == UserRole.ADMIN and manager_id else user.id
-    if user.role != UserRole.ADMIN and manager_id and manager_id != user.id:
+    target_id = manager_id if is_staff(user) and manager_id else user.id
+    if not is_staff(user) and manager_id and manager_id != user.id:
         from app.core.exceptions import ForbiddenError
 
         raise ForbiddenError("Cannot view another manager stats")
@@ -308,4 +318,158 @@ async def manager_stats(
         average_objections_score=_avg(avg_objections),
         total_cost_rub=Decimal(str(total_cost or 0)),
         outcomes=outcomes,
+        manager_id=target_id,
     )
+
+
+async def team_stats(session: AsyncSession) -> TeamStats:
+    managers_result = await session.execute(
+        select(User).where(User.role == UserRole.MANAGER).order_by(User.full_name)
+    )
+    managers = list(managers_result.scalars().all())
+    manager_rows: list[ManagerStats] = []
+    for manager in managers:
+        stats = await manager_stats(session, manager)
+        stats.manager_id = manager.id
+        stats.manager_name = manager.full_name
+        stats.manager_email = manager.email
+        manager_rows.append(stats)
+
+    totals = await session.execute(
+        select(
+            func.count(Training.id),
+            func.coalesce(func.sum(Training.total_cost_rub), 0),
+        ).join(User, User.id == Training.user_id)
+        .where(User.role == UserRole.MANAGER)
+    )
+    trainings_total, total_cost = totals.one()
+
+    completed = await session.execute(
+        select(func.count(Training.id))
+        .join(User, User.id == Training.user_id)
+        .where(User.role == UserRole.MANAGER, Training.status == TrainingStatus.COMPLETED)
+    )
+    trainings_completed = int(completed.scalar_one())
+
+    scores = await session.execute(
+        select(func.avg(Analysis.overall_score))
+        .join(Training, Training.id == Analysis.training_id)
+        .join(User, User.id == Training.user_id)
+        .where(User.role == UserRole.MANAGER)
+    )
+    avg_overall = scores.scalar_one()
+
+    outcomes_raw = await session.execute(
+        select(Training.outcome, func.count(Training.id))
+        .join(User, User.id == Training.user_id)
+        .where(User.role == UserRole.MANAGER, Training.outcome.is_not(None))
+        .group_by(Training.outcome)
+    )
+    outcomes: dict[str, int] = {
+        (row[0].value if row[0] else "unknown"): int(row[1]) for row in outcomes_raw.all()
+    }
+
+    total = int(trainings_total or 0)
+    completion_rate = round((trainings_completed / total) * 100, 1) if total else 0.0
+
+    def _avg(value: Any) -> float | None:
+        if value is None:
+            return None
+        return round(float(value), 2)
+
+    return TeamStats(
+        trainings_total=total,
+        trainings_completed=trainings_completed,
+        completion_rate=completion_rate,
+        average_overall_score=_avg(avg_overall),
+        total_cost_rub=Decimal(str(total_cost or 0)),
+        outcomes=outcomes,
+        managers=manager_rows,
+    )
+
+
+async def team_series(
+    session: AsyncSession,
+    *,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    granularity: str = "week",
+) -> list[StatsSeriesPoint]:
+    trunc = "week" if granularity == "week" else "day"
+    period_expr = func.date_trunc(trunc, Training.created_at)
+
+    filters = [User.role == UserRole.MANAGER]
+    if date_from is not None:
+        filters.append(Training.created_at >= date_from)
+    if date_to is not None:
+        filters.append(Training.created_at <= date_to)
+
+    result = await session.execute(
+        select(
+            period_expr.label("period"),
+            func.count(Training.id),
+            func.avg(Analysis.overall_score),
+            func.coalesce(func.sum(Training.total_cost_rub), 0),
+        )
+        .select_from(Training)
+        .join(User, User.id == Training.user_id)
+        .outerjoin(Analysis, Analysis.training_id == Training.id)
+        .where(*filters)
+        .group_by(period_expr)
+        .order_by(period_expr)
+    )
+
+    points: list[StatsSeriesPoint] = []
+    for period, count, avg_score, cost in result.all():
+        points.append(
+            StatsSeriesPoint(
+                period=period.date().isoformat() if period is not None else "",
+                trainings_count=int(count or 0),
+                average_overall_score=round(float(avg_score), 2) if avg_score is not None else None,
+                total_cost_rub=Decimal(str(cost or 0)),
+            )
+        )
+    return points
+
+
+async def team_report_csv_rows(
+    session: AsyncSession,
+    *,
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+) -> list[dict[str, Any]]:
+    query = (
+        select(Training)
+        .options(
+            selectinload(Training.analysis),
+            selectinload(Training.user),
+            selectinload(Training.client_profile),
+        )
+        .join(User, User.id == Training.user_id)
+        .where(User.role == UserRole.MANAGER)
+        .order_by(Training.created_at.desc())
+    )
+    if date_from is not None:
+        query = query.where(Training.created_at >= date_from)
+    if date_to is not None:
+        query = query.where(Training.created_at <= date_to)
+    result = await session.execute(query)
+    rows: list[dict[str, Any]] = []
+    for training in result.scalars().all():
+        manager = training.user
+        rows.append(
+            {
+                "training_id": str(training.id),
+                "manager_name": manager.full_name if manager else "",
+                "manager_email": manager.email if manager else "",
+                "difficulty": training.difficulty.value,
+                "client_role": training.client_role.value,
+                "status": training.status.value,
+                "outcome": training.outcome.value if training.outcome else "",
+                "overall_score": training.analysis.overall_score if training.analysis else "",
+                "total_cost_rub": str(training.total_cost_rub),
+                "created_at": training.created_at.isoformat() if training.created_at else "",
+                "ended_at": training.ended_at.isoformat() if training.ended_at else "",
+            }
+        )
+    return rows

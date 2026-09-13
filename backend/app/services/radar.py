@@ -21,6 +21,7 @@ from app.schemas.radar import (
     aggregate_score,
     zero_radar_scores,
 )
+from app.services import billing as billing_service
 from app.services.ai_settings import load_ai_settings
 from app.services.llm import complete_structured
 from app.services.prompts import assemble_radar_messages, load_active_prompt
@@ -156,6 +157,7 @@ async def analyze_manager_message(
 
     started = time.perf_counter()
     try:
+        await billing_service.ensure_balance(session)
         runtime = await load_ai_settings(session)
         prompt = await load_active_prompt(session, "radar_analyzer")
         llm_messages = assemble_radar_messages(
@@ -195,7 +197,14 @@ async def analyze_manager_message(
             latency_ms=latency_ms,
         )
         session.add(row)
-        add_cost(training, usage.cost_rub)
+        await add_cost(
+            session,
+            training,
+            usage.cost_rub,
+            reason="radar_analyze",
+            ref_type="message_analysis",
+            meta={"model": usage.model, "tokens": usage.total_tokens},
+        )
         await session.commit()
         await session.refresh(row)
         return AnalyzeMessageResponse(

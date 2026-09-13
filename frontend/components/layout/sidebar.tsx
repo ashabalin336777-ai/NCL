@@ -3,16 +3,20 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  BarChart3,
   BookOpen,
+  FileText,
   LayoutDashboard,
   LogOut,
   MessageSquare,
   Settings,
   Users,
+  Wallet,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { roleLabel } from "@/lib/roles";
 import { useAuthStore } from "@/store/auth";
 
 const managerLinks = [
@@ -20,10 +24,18 @@ const managerLinks = [
   { href: "/trainings", label: "Тренировки", icon: MessageSquare },
 ];
 
-const adminLinks = [
-  { href: "/admin/users", label: "Команда", icon: Users },
-  { href: "/admin/knowledge", label: "База знаний", icon: BookOpen },
-  { href: "/admin/settings", label: "AI-настройки", icon: Settings },
+const ropLinks = [
+  { href: "/rop/analytics", label: "Аналитика", icon: BarChart3 },
+  { href: "/rop/team", label: "Команда", icon: Users },
+  { href: "/rop/reports", label: "Отчёты", icon: FileText },
+];
+
+const developerLinks = [
+  { href: "/dev/billing", label: "Баланс", icon: Wallet },
+  { href: "/dev/settings", label: "AI-настройки", icon: Settings },
+  { href: "/dev/prompts", label: "Промпты", icon: FileText },
+  { href: "/dev/knowledge", label: "База знаний", icon: BookOpen },
+  { href: "/dev/users", label: "Пользователи", icon: Users },
 ];
 
 export function Sidebar(): React.JSX.Element {
@@ -31,7 +43,12 @@ export function Sidebar(): React.JSX.Element {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
-  const links = user?.role === "admin" ? [...managerLinks, ...adminLinks] : managerLinks;
+
+  const links = [
+    ...managerLinks,
+    ...(user?.role === "admin" || user?.role === "developer" ? ropLinks : []),
+    ...(user?.role === "developer" ? developerLinks : []),
+  ];
 
   async function onLogout(): Promise<void> {
     await logout();
@@ -46,7 +63,7 @@ export function Sidebar(): React.JSX.Element {
         <p className="mt-1 text-xs text-slate-500">Тренажёр дожатия сделок с ИИ</p>
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1 p-3">
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
         {links.map((item) => {
           const Icon = item.icon;
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -73,7 +90,7 @@ export function Sidebar(): React.JSX.Element {
           <p className="truncate text-sm font-medium text-slate-900">{user?.full_name}</p>
           <p className="truncate text-xs text-slate-500">{user?.email}</p>
           <p className="mt-1 text-[11px] uppercase tracking-wide text-accent">
-            {user?.role === "admin" ? "РОП" : "Менеджер"}
+            {user ? roleLabel(user.role) : ""}
           </p>
         </div>
         <Button variant="outline" className="w-full" onClick={() => void onLogout()}>

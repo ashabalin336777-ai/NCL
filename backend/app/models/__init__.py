@@ -1,7 +1,9 @@
 from app.models.ai_setting import AISetting
 from app.models.analysis import Analysis
+from app.models.billing import BillingAccount, BillingLedger
 from app.models.client_profile import ClientProfile
 from app.models.enums import (
+    BillingLedgerType,
     ClientRole,
     Difficulty,
     MessageRole,
@@ -20,6 +22,9 @@ from app.models.user import User
 __all__ = [
     "AISetting",
     "Analysis",
+    "BillingAccount",
+    "BillingLedger",
+    "BillingLedgerType",
     "ClientProfile",
     "ClientRole",
     "Difficulty",

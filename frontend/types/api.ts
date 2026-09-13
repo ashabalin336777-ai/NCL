@@ -1,4 +1,4 @@
-export type UserRole = "manager" | "admin";
+export type UserRole = "manager" | "admin" | "developer";
 
 export interface User {
   id: string;
@@ -29,6 +29,71 @@ export interface ManagerStats {
   average_objections_score: number | null;
   total_cost_rub: string;
   outcomes: Record<string, number>;
+  manager_id?: string | null;
+  manager_name?: string | null;
+  manager_email?: string | null;
+}
+
+export interface TeamStats {
+  trainings_total: number;
+  trainings_completed: number;
+  completion_rate: number;
+  average_overall_score: number | null;
+  total_cost_rub: string;
+  outcomes: Record<string, number>;
+  managers: ManagerStats[];
+}
+
+export interface StatsSeriesPoint {
+  period: string;
+  trainings_count: number;
+  average_overall_score: number | null;
+  total_cost_rub: string;
+}
+
+export interface BillingAccount {
+  balance_rub: string;
+  currency: string;
+  updated_at: string | null;
+  min_reserve_rub: string;
+}
+
+export interface BillingLedgerEntry {
+  id: string;
+  created_at: string;
+  type: string;
+  amount_rub: string;
+  balance_after: string;
+  reason: string;
+  ref_type: string | null;
+  ref_id: string | null;
+  note: string | null;
+  provider: string | null;
+  meta_json: Record<string, unknown> | null;
+}
+
+export interface PromptItem {
+  id: string;
+  name: string;
+  system_prompt_text: string;
+  version: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface KnowledgeArticle {
+  id: string;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AISetting {
+  id: string;
+  key: string;
+  value: unknown;
+  updated_at: string;
 }
 
 export interface TrainingListItem {

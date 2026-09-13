@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     seed_admin_email: str = "admin@ncl.local"
     seed_admin_password: str = "ChangeMe_Admin_123"
     seed_manager_password: str = "ChangeMe_Manager_123"
+    seed_developer_email: str = "dev@ncl.local"
+    seed_developer_password: str = "ChangeMe_Dev_123"
+    seed_billing_balance_rub: float = 5000.0
 
     @field_validator("database_url")
     @classmethod
