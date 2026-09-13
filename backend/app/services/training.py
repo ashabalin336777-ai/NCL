@@ -12,6 +12,7 @@ from app.core.exceptions import (
     LLMTimeoutError,
     NotFoundError,
 )
+from app.domain.labels import CLIENT_ROLE_LABELS
 from app.models.client_profile import ClientProfile
 from app.models.enums import MessageRole, TrainingStatus, UserRole
 from app.models.hint import Hint
@@ -40,6 +41,7 @@ def _load_options() -> list:
         selectinload(Training.hints),
         selectinload(Training.client_profile),
         selectinload(Training.analysis),
+        selectinload(Training.message_analyses),
     ]
 
 
@@ -68,6 +70,29 @@ def can_see_hidden_card(user: User, training: Training) -> bool:
     return training.status in {TrainingStatus.COMPLETED, TrainingStatus.ABORTED}
 
 
+def client_brief_from_training(training: Training) -> dict[str, str] | None:
+    if training.client_profile is None:
+        return None
+    raw = training.client_profile.hidden_card_json or {}
+    company = str(raw.get("company_name") or "").strip()
+    contact = str(raw.get("contact_name") or "").strip()
+    if not company and not contact:
+        return None
+    return {
+        "company_name": company or "Клиент",
+        "contact_name": contact or "Собеседник",
+        "role_title": str(raw.get("role_title") or "").strip() or "Клиент",
+        "industry": str(raw.get("industry") or "").strip() or "—",
+    }
+
+
+def client_chat_label(training: Training) -> str | None:
+    brief = client_brief_from_training(training)
+    if brief is None:
+        return None
+    return f"{brief['contact_name']}, {brief['company_name']}"
+
+
 def add_cost(training: Training, amount: Decimal) -> None:
     training.total_cost_rub = Decimal(training.total_cost_rub) + amount
 
@@ -82,12 +107,25 @@ def transcript(training: Training) -> str:
 
 def _fallback_card_draft(payload: TrainingCreateRequest) -> HiddenClientCardDraft:
     industry = payload.resolved_industry() or "Промышленная автоматизация"
+    pool = [
+        ("Павел Смирнов", "ООО «МикроЛайн»"),
+        ("Елена Кузнецова", "АО «ТехноКонтур»"),
+        ("Игорь Белов", "НПО «РадиоВектор»"),
+        ("Марина Орлова", "ООО «ПланарСистемс»"),
+        ("Сергей Громов", "АО «Силовые Модули»"),
+        ("Ольга Васильева", "ООО «ЭлектроСнаб Регион»"),
+        ("Дмитрий Савельев", "АО «Индустрия Схем»"),
+        ("Наталья Фролова", "ООО «КомпонентПром»"),
+    ]
+    seed = f"{industry}:{payload.client_role.value}:{payload.difficulty.value}"
+    contact_name, company_base = pool[sum(ord(ch) for ch in seed) % len(pool)]
+    role_title = CLIENT_ROLE_LABELS.get(payload.client_role, "Клиент")
     return HiddenClientCardDraft(
-        company_name=f"НПО «Сигнал» ({industry})",
-        contact_name="Андрей Морозов",
-        role_title="Снабженец",
+        company_name=f"{company_base} ({industry})",
+        contact_name=contact_name,
+        role_title=role_title,
         industry=industry,
-        product="Плата управления и электронные компоненты серийной линейки",
+        product="Электронные компоненты и модули для серийного производства",
         hidden_pain=(
             "Текущий поставщик срывает сроки и есть риск контрафакта после смены канала. "
             "Боимся остановки линии и штрафов по контракту."
@@ -183,8 +221,10 @@ async def create_training_with_card(
                 {
                     "role": "user",
                     "content": (
-                        "Начни диалог одной короткой репликой клиента. "
+                        f"Начни диалог одной короткой репликой. Ты — {card.contact_name}, "
+                        f"{card.role_title} в компании {card.company_name}. "
                         "Ты сам вышел на связь или отвечаешь на холодный контакт. "
+                        "Не называй чужое имя или другую компанию. "
                         "Не раскрывай скрытую боль. Без кавычек и пояснений."
                     ),
                 },
@@ -196,8 +236,9 @@ async def create_training_with_card(
         )
     except (LLMTimeoutError, LLMResponseError):
         opening = (
-            "Добрый день. Это по поставкам электронных компонентов — "
-            "есть вопрос по текущим закупкам, удобно пару минут?"
+            f"Добрый день, {card.contact_name}, {card.company_name}. "
+            "Это по поставкам электронных компонентов — есть вопрос по текущим закупкам, "
+            "удобно пару минут?"
         )
         opening_usage = UsageInfo(
             model="fallback",

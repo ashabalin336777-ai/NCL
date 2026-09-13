@@ -38,6 +38,7 @@ export interface TrainingListItem {
   manager_email: string | null;
   difficulty: string;
   client_role: string;
+  industry: string | null;
   status: string;
   outcome: string | null;
   overall_score: number | null;

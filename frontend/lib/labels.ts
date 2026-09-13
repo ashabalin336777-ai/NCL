@@ -17,6 +17,22 @@ export const STATUS_LABELS: Record<string, string> = {
   aborted: "Прервана",
 };
 
+export const OUTCOME_LABELS: Record<string, string> = {
+  next_step_agreed: "Согласован следующий шаг",
+  polite_reject: "Вежливый отказ",
+  hard_reject: "Жёсткий отказ",
+  abandoned: "Сессия брошена",
+};
+
+export const RADAR_COMPETENCY_LABELS: Record<string, string> = {
+  needs_discovery: "Выявление боли",
+  solution_presentation: "Презентация",
+  objection_handling: "Возражения",
+  closing_persistence: "Закрытие",
+  technical_expertise: "Техника",
+  risk_management: "Риски",
+};
+
 export const INDUSTRIES = [
   "Медицина",
   "IoT",

@@ -8,8 +8,9 @@ import { ArrowLeft, Loader2, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CompetencyRadar } from "@/components/training/competency-radar";
 import { ApiError, apiFetch } from "@/lib/api";
-import { CLIENT_ROLE_LABELS, DIFFICULTY_LABELS } from "@/lib/labels";
+import { CLIENT_ROLE_LABELS, DIFFICULTY_LABELS, OUTCOME_LABELS } from "@/lib/labels";
 import type { Analysis, Training } from "@/types/training";
 
 function Score({ label, value }: { label: string; value: number }): React.JSX.Element {
@@ -67,10 +68,19 @@ export default function TrainingAnalysisPage(): React.JSX.Element {
           <p className="text-sm font-medium text-accent">Анализ Sol</p>
           <h2 className="mt-1 text-3xl font-semibold text-navy">Разбор полётов</h2>
           {training ? (
-            <p className="mt-2 text-sm text-slate-600">
-              {DIFFICULTY_LABELS[training.difficulty]} ·{" "}
-              {CLIENT_ROLE_LABELS[training.client_role]}
-            </p>
+            <>
+              <p className="mt-2 text-sm font-medium text-slate-800">
+                {training.client_brief
+                  ? `${training.client_brief.company_name} · ${training.client_brief.contact_name}`
+                  : training.hidden_card
+                    ? `${training.hidden_card.company_name} · ${training.hidden_card.contact_name}`
+                    : null}
+              </p>
+              <p className="mt-1 text-sm text-slate-600">
+                {DIFFICULTY_LABELS[training.difficulty]} ·{" "}
+                {CLIENT_ROLE_LABELS[training.client_role]}
+              </p>
+            </>
           ) : null}
         </div>
         <Link
@@ -83,6 +93,16 @@ export default function TrainingAnalysisPage(): React.JSX.Element {
       </div>
 
       {query.isLoading ? <p className="text-sm text-slate-500">Загрузка…</p> : null}
+
+      {training ? (
+        <CompetencyRadar
+          data={training.radar_scores}
+          title="Итоговые компетенции"
+          description="Накопительный радар по всей сессии"
+          managerReplies={training.messages.filter((item) => item.role === "user").length}
+          hintRequests={training.hints.length}
+        />
+      ) : null}
 
       {!analysis ? (
         <Card>
@@ -131,7 +151,12 @@ export default function TrainingAnalysisPage(): React.JSX.Element {
           <Card>
             <CardHeader>
               <CardTitle>Резюме</CardTitle>
-              <CardDescription>Outcome: {analysis.summary_json.outcome ?? "—"}</CardDescription>
+              <CardDescription>
+                Итог:{" "}
+                {OUTCOME_LABELS[analysis.summary_json.outcome ?? ""] ??
+                  analysis.summary_json.outcome ??
+                  "—"}
+              </CardDescription>
             </CardHeader>
             <CardContent className="text-sm leading-7 text-slate-700">
               {analysis.summary_json.text}

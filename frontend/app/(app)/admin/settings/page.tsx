@@ -12,6 +12,20 @@ interface AISetting {
   updated_at: string;
 }
 
+const SETTING_LABELS: Record<string, string> = {
+  llm_base_url: "URL NeuralDEEP",
+  llm_api_key: "API-ключ",
+  client_model_id: "Модель чата (клиент)",
+  card_model_id: "Модель карточки",
+  hint_model_id: "Модель Terra",
+  analyst_model_id: "Модель Sol",
+  radar_model_id: "Модель радара реплики",
+  cost_per_1k_input_tokens_rub: "Тариф вход / 1k",
+  cost_per_1k_output_tokens_rub: "Тариф выход / 1k",
+  llm_timeout_seconds: "Таймаут LLM, сек",
+  model_tariffs: "Тарифы моделей",
+};
+
 export default function AdminSettingsPage(): React.JSX.Element {
   const query = useQuery({
     queryKey: ["admin", "settings"],
@@ -38,7 +52,12 @@ export default function AdminSettingsPage(): React.JSX.Element {
               key={item.id}
               className="grid gap-1 rounded-xl border border-slate-200 px-4 py-3 md:grid-cols-[220px_1fr]"
             >
-              <p className="text-sm font-medium text-navy">{item.key}</p>
+              <div>
+                <p className="text-sm font-medium text-navy">
+                  {SETTING_LABELS[item.key] ?? item.key}
+                </p>
+                <p className="text-[11px] text-slate-400">{item.key}</p>
+              </div>
               <pre className="overflow-auto text-xs text-slate-700">
                 {item.key === "llm_api_key"
                   ? "••••••••"

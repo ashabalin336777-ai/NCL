@@ -22,7 +22,7 @@ from app.schemas.admin import (
     UserCreateRequest,
     UserUpdateRequest,
 )
-from app.schemas.ai import HiddenClientCard
+from app.schemas.ai import ClientBriefPublic, HiddenClientCard
 from app.schemas.common import APIMessage
 from app.schemas.training import TrainingCompleteResponse, TrainingPublic
 from app.schemas.user import UserPublic
@@ -34,7 +34,13 @@ from app.services.analysis import (
     manager_stats,
     run_sol_analysis,
 )
-from app.services.training import can_see_hidden_card
+from app.services.radar import radar_scores_from_training
+from app.services.training import (
+    can_see_hidden_card,
+    client_brief_from_training,
+    client_chat_label,
+)
+from app.schemas.radar import RadarScoresPublic
 
 admin_router = APIRouter(prefix="/admin", tags=["admin"])
 stats_router = APIRouter(prefix="/stats", tags=["stats"])
@@ -48,6 +54,11 @@ def training_to_public(training, user: User) -> TrainingPublic:
     state = sa_inspect(training)
     if "analysis" not in state.unloaded and training.analysis is not None:
         analysis = AnalysisPublic.model_validate(training.analysis)
+    radar = None
+    if "message_analyses" not in state.unloaded:
+        radar = RadarScoresPublic(**radar_scores_from_training(training))
+    brief_data = client_brief_from_training(training)
+    brief = ClientBriefPublic(**brief_data) if brief_data else None
     return TrainingPublic(
         id=training.id,
         difficulty=training.difficulty,
@@ -61,8 +72,11 @@ def training_to_public(training, user: User) -> TrainingPublic:
         ended_at=training.ended_at,
         messages=training.messages,
         hints=training.hints,
+        client_brief=brief,
+        client_label=client_chat_label(training),
         hidden_card=card,
         analysis=analysis,
+        radar_scores=radar,
     )
 
 

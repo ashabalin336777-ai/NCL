@@ -25,3 +25,33 @@ body {
   background: #cbd5e1;
   border-radius: 999px;
 }
+
+@keyframes ncl-typing-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.ncl-typing-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 9999px;
+  background: #1e3a8a;
+  animation: ncl-typing-bounce 1.2s ease-in-out infinite;
+}
+
+.ncl-typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.ncl-typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+

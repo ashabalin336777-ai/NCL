@@ -12,6 +12,7 @@ from app.models.enums import (
 from app.models.hint import Hint
 from app.models.knowledge_base import KnowledgeBase
 from app.models.message import Message
+from app.models.message_analysis import MessageAnalysis
 from app.models.prompt import Prompt
 from app.models.training import Training
 from app.models.user import User
@@ -25,6 +26,7 @@ __all__ = [
     "Hint",
     "KnowledgeBase",
     "Message",
+    "MessageAnalysis",
     "MessageRole",
     "Prompt",
     "Training",

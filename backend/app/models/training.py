@@ -103,3 +103,8 @@ class Training(Base):
         uselist=False,
         cascade="all, delete-orphan",
     )
+    message_analyses: Mapped[list["MessageAnalysis"]] = relationship(
+        back_populates="training",
+        cascade="all, delete-orphan",
+        order_by="MessageAnalysis.created_at",
+    )

@@ -10,6 +10,8 @@ interface CollapsibleBlockProps {
   text: string;
   /** Start collapsed when text is long enough */
   defaultCollapsed?: boolean;
+  /** When false, keep original casing (needed for person/company names). */
+  uppercaseTitle?: boolean;
   className?: string;
   titleClassName?: string;
   bodyClassName?: string;
@@ -21,6 +23,7 @@ export function CollapsibleBlock({
   title,
   text,
   defaultCollapsed,
+  uppercaseTitle = true,
   className,
   titleClassName,
   bodyClassName,
@@ -46,7 +49,13 @@ export function CollapsibleBlock({
   return (
     <div className={cn(className)}>
       <div className="mb-1 flex items-start justify-between gap-2">
-        <p className={cn("text-[11px] font-medium uppercase tracking-wide opacity-70", titleClassName)}>
+        <p
+          className={cn(
+            "text-[11px] font-medium tracking-wide opacity-70",
+            uppercaseTitle && "uppercase",
+            titleClassName,
+          )}
+        >
           {title}
         </p>
         {canCollapse ? (

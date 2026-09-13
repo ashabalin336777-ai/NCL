@@ -10,15 +10,51 @@ interface ChatMessagesProps {
   messages: Message[];
   pendingAssistant?: string;
   sending?: boolean;
+  managerName?: string | null;
+  /** Full label from card, e.g. "Виктор Сергеевич Волков, АО «ТехноДрайв»" */
+  clientLabel?: string | null;
+  clientName?: string | null;
+  clientCompany?: string | null;
+}
+
+function buildClientLabel(
+  clientLabel?: string | null,
+  clientName?: string | null,
+  clientCompany?: string | null,
+): string {
+  const ready = clientLabel?.trim();
+  if (ready) {
+    return ready;
+  }
+  const name = clientName?.trim();
+  const company = clientCompany?.trim();
+  if (name && company) {
+    return `${name}, ${company}`;
+  }
+  if (name) {
+    return name;
+  }
+  if (company) {
+    return company;
+  }
+  return "Клиент";
 }
 
 export function ChatMessages({
   messages,
   pendingAssistant,
   sending,
+  managerName,
+  clientLabel,
+  clientName,
+  clientCompany,
 }: ChatMessagesProps): React.JSX.Element {
   const endRef = useRef<HTMLDivElement | null>(null);
   const lastId = messages.at(-1)?.id;
+  const managerLabel = managerName?.trim() || "Вы";
+  const assistantLabel = buildClientLabel(clientLabel, clientName, clientCompany);
+  const firstName = clientName?.trim() || assistantLabel.split(",")[0]?.trim() || "Клиент";
+  const typingLabel = `${firstName} печатает…`;
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -39,9 +75,10 @@ export function ChatMessages({
             )}
           >
             <CollapsibleBlock
-              title={message.role === "user" ? "Вы" : "Клиент"}
+              title={message.role === "user" ? managerLabel : assistantLabel}
               text={message.content}
               defaultCollapsed={!isLatest}
+              uppercaseTitle={false}
               titleClassName={message.role === "user" ? "text-white/80" : undefined}
               bodyClassName={message.role === "user" ? "text-white" : undefined}
               toggleClassName={
@@ -54,13 +91,32 @@ export function ChatMessages({
 
       {pendingAssistant ? (
         <div className="mr-auto max-w-[85%] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800">
-          <CollapsibleBlock title="Клиент" text={pendingAssistant} defaultCollapsed={false} />
+          <CollapsibleBlock
+            title={assistantLabel}
+            text={pendingAssistant}
+            defaultCollapsed={false}
+            uppercaseTitle={false}
+          />
         </div>
       ) : null}
 
       {sending && !pendingAssistant ? (
-        <div className="mr-auto rounded-2xl border border-dashed border-slate-300 px-4 py-3 text-sm text-slate-500">
-          Клиент печатает…
+        <div
+          className="mr-auto max-w-[85%] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm"
+          aria-live="polite"
+          aria-label={typingLabel}
+        >
+          <p className="mb-2 text-[11px] font-medium tracking-wide text-slate-500">
+            {assistantLabel}
+          </p>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-2 ring-1 ring-slate-200">
+              <span className="ncl-typing-dot" />
+              <span className="ncl-typing-dot" />
+              <span className="ncl-typing-dot" />
+            </div>
+            <p className="text-sm font-medium text-slate-600">{firstName} печатает</p>
+          </div>
         </div>
       ) : null}
 

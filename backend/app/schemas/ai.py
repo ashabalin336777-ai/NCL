@@ -61,6 +61,15 @@ class HiddenClientCard(HiddenClientCardDraft):
     role_code: ClientRole
 
 
+class ClientBriefPublic(BaseModel):
+    """Non-spoiler intro visible to the manager during an active session."""
+
+    company_name: str
+    contact_name: str
+    role_title: str
+    industry: str
+
+
 class UsageInfo(BaseModel):
     model: str
     prompt_tokens: int
@@ -76,6 +85,7 @@ class AIRuntimePublic(BaseModel):
     card_model_id: str
     hint_model_id: str
     analyst_model_id: str
+    radar_model_id: str
     timeout_seconds: int
     tariffs: dict[str, Any]
     allowed_models: list[str]

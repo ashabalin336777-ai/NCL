@@ -43,3 +43,8 @@ class Message(Base):
 
     training: Mapped["Training"] = relationship(back_populates="messages")
     hints: Mapped[list["Hint"]] = relationship(back_populates="message")
+    message_analysis: Mapped["MessageAnalysis | None"] = relationship(
+        back_populates="message",
+        uselist=False,
+        cascade="all, delete-orphan",
+    )

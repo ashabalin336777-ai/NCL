@@ -6,6 +6,7 @@ import { ArrowRight, BarChart3, MessageSquare } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiFetch } from "@/lib/api";
+import { CLIENT_ROLE_LABELS, DIFFICULTY_LABELS, OUTCOME_LABELS, STATUS_LABELS } from "@/lib/labels";
 import { useAuthStore } from "@/store/auth";
 import type { ManagerStats, TrainingListItem } from "@/types/api";
 
@@ -77,7 +78,7 @@ export default function DashboardPage(): React.JSX.Element {
           </CardHeader>
           <CardContent className="space-y-3">
             {(trainingsQuery.data ?? []).length === 0 ? (
-              <p className="text-sm text-slate-500">Пока нет тренировок. Создайте первую на следующем этапе UI.</p>
+              <p className="text-sm text-slate-500">Пока нет тренировок. Создайте первую.</p>
             ) : (
               trainingsQuery.data?.map((item) => (
                 <Link
@@ -91,14 +92,22 @@ export default function DashboardPage(): React.JSX.Element {
                 >
                   <div>
                     <p className="text-sm font-medium text-slate-900">
-                      {item.difficulty} · {item.client_role}
+                      {DIFFICULTY_LABELS[item.difficulty] ?? item.difficulty} ·{" "}
+                      {CLIENT_ROLE_LABELS[item.client_role] ?? item.client_role}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {new Date(item.created_at).toLocaleString("ru-RU")} · {item.status}
+                      {item.industry ? `${item.industry} · ` : ""}
+                      {new Date(item.created_at).toLocaleString("ru-RU")}
+                    </p>
+                    <p className="text-xs text-slate-600">
+                      {STATUS_LABELS[item.status] ?? item.status}
+                      {item.outcome
+                        ? ` · ${OUTCOME_LABELS[item.outcome] ?? item.outcome}`
+                        : ""}
                     </p>
                   </div>
                   <span className="text-sm font-semibold text-navy">
-                    {item.overall_score != null ? `${item.overall_score}/10` : "—"}
+                    {item.overall_score != null ? `${item.overall_score}/10` : "без оценки"}
                   </span>
                 </Link>
               ))

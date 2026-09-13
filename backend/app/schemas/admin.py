@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import TrainingOutcome, UserRole
+from app.models.enums import UserRole
 from app.schemas.common import ORMModel
 from app.schemas.types import AppEmail
 
@@ -98,8 +98,9 @@ class TrainingListItem(ORMModel):
     manager_email: str | None = None
     difficulty: str
     client_role: str
+    industry: str | None = None
     status: str
-    outcome: TrainingOutcome | None
+    outcome: str | None = None
     overall_score: int | None = None
     total_cost_rub: Decimal
     created_at: datetime

@@ -58,6 +58,22 @@ export interface HiddenClientCard {
   role_code: ClientRole;
 }
 
+export interface RadarScores {
+  needs_discovery: number;
+  solution_presentation: number;
+  objection_handling: number;
+  closing_persistence: number;
+  technical_expertise: number;
+  risk_management: number;
+}
+
+export interface ClientBrief {
+  company_name: string;
+  contact_name: string;
+  role_title: string;
+  industry: string;
+}
+
 export interface Training {
   id: string;
   difficulty: Difficulty;
@@ -71,8 +87,12 @@ export interface Training {
   ended_at: string | null;
   messages: Message[];
   hints: Hint[];
+  client_brief?: ClientBrief | null;
+  /** Ready-made chat label: "Имя, Компания" from generated card */
+  client_label?: string | null;
   hidden_card: HiddenClientCard | null;
   analysis: Analysis | null;
+  radar_scores?: RadarScores | null;
 }
 
 export interface TrainingCreateResponse extends Training {

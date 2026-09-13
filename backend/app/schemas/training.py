@@ -7,8 +7,9 @@ from pydantic import BaseModel, Field
 from app.domain.labels import INDUSTRIES
 from app.models.enums import ClientRole, Difficulty, MessageRole, TrainingOutcome, TrainingStatus
 from app.schemas.admin import AnalysisPublic
-from app.schemas.ai import HiddenClientCard, UsageInfo
+from app.schemas.ai import ClientBriefPublic, HiddenClientCard, UsageInfo
 from app.schemas.common import ORMModel
+from app.schemas.radar import RadarScoresPublic
 
 
 class TrainingCreateRequest(BaseModel):
@@ -60,8 +61,11 @@ class TrainingPublic(ORMModel):
     ended_at: datetime | None
     messages: list[MessagePublic] = Field(default_factory=list)
     hints: list[HintPublic] = Field(default_factory=list)
+    client_brief: ClientBriefPublic | None = None
+    client_label: str | None = None
     hidden_card: HiddenClientCard | None = None
     analysis: AnalysisPublic | None = None
+    radar_scores: RadarScoresPublic | None = None
 
 
 class TrainingCreateResponse(TrainingPublic):

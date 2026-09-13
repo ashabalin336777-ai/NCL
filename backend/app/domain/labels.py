@@ -1,4 +1,4 @@
-from app.models.enums import ClientRole, Difficulty
+from app.models.enums import ClientRole, Difficulty, TrainingOutcome
 
 CLIENT_ROLE_LABELS: dict[ClientRole, str] = {
     ClientRole.PROCUREMENT_DIRECTOR: "Директор по закупкам (CPO)",
@@ -10,6 +10,13 @@ DIFFICULTY_LABELS: dict[Difficulty, str] = {
     Difficulty.EASY: "Лёгкий",
     Difficulty.MEDIUM: "Средний",
     Difficulty.HARD: "Сложный",
+}
+
+OUTCOME_LABELS: dict[TrainingOutcome, str] = {
+    TrainingOutcome.NEXT_STEP_AGREED: "Согласован следующий шаг",
+    TrainingOutcome.POLITE_REJECT: "Вежливый отказ",
+    TrainingOutcome.HARD_REJECT: "Жёсткий отказ",
+    TrainingOutcome.ABANDONED: "Сессия брошена",
 }
 
 INDUSTRIES: tuple[str, ...] = (

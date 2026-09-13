@@ -13,7 +13,12 @@ from app.models.message import Message
 from app.models.training import Training
 from app.models.user import User
 from app.schemas.admin import AnalysisPublic, TrainingCompleteRequest, TrainingListItem
-from app.schemas.ai import AIRuntimePublic, HiddenClientCard, UsageInfo
+from app.schemas.ai import AIRuntimePublic, ClientBriefPublic, HiddenClientCard, UsageInfo
+from app.schemas.radar import (
+    AnalyzeMessageRequest,
+    AnalyzeMessageResponse,
+    RadarScoresPublic,
+)
 from app.schemas.training import (
     ChatMessageRequest,
     HintPublic,
@@ -32,9 +37,12 @@ from app.services.analysis import (
 from app.services.llm import stream_text
 from app.services.neuraldeep_models import ALLOWED_MODELS
 from app.services.prompts import assemble_client_system, windowed_chat_messages
+from app.services.radar import analyze_manager_message, radar_scores_from_training
 from app.services.training import (
     add_cost,
     can_see_hidden_card,
+    client_brief_from_training,
+    client_chat_label,
     create_hint,
     create_training_with_card,
     get_training_for_user,
@@ -54,11 +62,22 @@ def _loaded_analysis(training: Training) -> AnalysisPublic | None:
     return AnalysisPublic.model_validate(training.analysis)
 
 
+def _client_brief(training: Training) -> ClientBriefPublic | None:
+    data = client_brief_from_training(training)
+    if data is None:
+        return None
+    return ClientBriefPublic(**data)
+
+
 def _to_public(training: Training, user: User) -> TrainingPublic:
     card = None
     if training.client_profile is not None and can_see_hidden_card(user, training):
         card = HiddenClientCard.model_validate(training.client_profile.hidden_card_json)
     analysis = _loaded_analysis(training)
+    radar = None
+    state = sa_inspect(training)
+    if "message_analyses" not in state.unloaded:
+        radar = RadarScoresPublic(**radar_scores_from_training(training))
     return TrainingPublic(
         id=training.id,
         difficulty=training.difficulty,
@@ -72,8 +91,11 @@ def _to_public(training: Training, user: User) -> TrainingPublic:
         ended_at=training.ended_at,
         messages=[item for item in training.messages],
         hints=[item for item in training.hints],
+        client_brief=_client_brief(training),
+        client_label=client_chat_label(training),
         hidden_card=card,
         analysis=analysis,
+        radar_scores=radar,
     )
 
 
@@ -145,6 +167,21 @@ async def request_hint(
     training = await get_training_for_user(session, training_id, user)
     hint, _usage = await create_hint(session, training)
     return HintPublic.model_validate(hint)
+
+
+@router.post("/{training_id}/analyze-message", response_model=AnalyzeMessageResponse)
+async def analyze_message(
+    training_id: UUID,
+    payload: AnalyzeMessageRequest,
+    session: DbSession,
+    user: CurrentUser,
+) -> AnalyzeMessageResponse:
+    return await analyze_manager_message(
+        session,
+        user,
+        training_id,
+        payload.message_id,
+    )
 
 
 @router.post("/{training_id}/complete", response_model=TrainingCompleteResponse)
@@ -305,6 +342,7 @@ async def ai_runtime(session: DbSession, _user: CurrentUser) -> AIRuntimePublic:
         card_model_id=runtime.card_model_id,
         hint_model_id=runtime.hint_model_id,
         analyst_model_id=runtime.analyst_model_id,
+        radar_model_id=runtime.radar_model_id,
         timeout_seconds=runtime.timeout_seconds,
         tariffs=runtime.tariffs,
         allowed_models=sorted(ALLOWED_MODELS),

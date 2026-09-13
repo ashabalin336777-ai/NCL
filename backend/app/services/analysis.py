@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import ConflictError, NotFoundError
+from app.domain.labels import OUTCOME_LABELS
 from app.models.analysis import Analysis
 from app.models.enums import TrainingOutcome, TrainingStatus, UserRole
 from app.models.training import Training
@@ -143,7 +144,15 @@ async def complete_training(
     run_analysis: bool = True,
     aborted: bool = False,
 ) -> tuple[Training, Analysis | None, UsageInfo | None]:
-    _require_active(training)
+    already_finished = training.status in {
+        TrainingStatus.COMPLETED,
+        TrainingStatus.ABORTED,
+    }
+    if already_finished:
+        # Idempotent: allow open analysis / retry without 409 after a double-click.
+        training = await get_training_with_analysis(session, training.id, user)
+        return training, training.analysis, None
+
     training.ended_at = datetime.now(timezone.utc)
     training.status = TrainingStatus.ABORTED if aborted else TrainingStatus.COMPLETED
     if aborted and training.outcome is None:
@@ -175,7 +184,11 @@ def _list_query(
 ) -> Select[tuple[Training]]:
     query = (
         select(Training)
-        .options(selectinload(Training.analysis), selectinload(Training.user))
+        .options(
+            selectinload(Training.analysis),
+            selectinload(Training.user),
+            selectinload(Training.client_profile),
+        )
         .order_by(Training.created_at.desc())
     )
     if user.role != UserRole.ADMIN:
@@ -202,6 +215,12 @@ async def list_trainings(
     items: list[TrainingListItem] = []
     for training in result.scalars().all():
         manager = training.user
+        industry = None
+        if training.client_profile is not None:
+            card = training.client_profile.hidden_card_json or {}
+            raw_industry = card.get("industry")
+            if isinstance(raw_industry, str) and raw_industry.strip():
+                industry = raw_industry.strip()
         items.append(
             TrainingListItem(
                 id=training.id,
@@ -210,8 +229,13 @@ async def list_trainings(
                 manager_email=manager.email if manager else None,
                 difficulty=training.difficulty.value,
                 client_role=training.client_role.value,
+                industry=industry,
                 status=training.status.value,
-                outcome=training.outcome,
+                outcome=(
+                    OUTCOME_LABELS.get(training.outcome)
+                    if training.outcome is not None
+                    else None
+                ),
                 overall_score=training.analysis.overall_score if training.analysis else None,
                 total_cost_rub=training.total_cost_rub,
                 created_at=training.created_at,

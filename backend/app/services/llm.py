@@ -103,16 +103,19 @@ def _raise_http_error(response: httpx.Response) -> None:
 async def _post_completion(
     runtime: AIRuntimeSettings,
     payload: dict[str, Any],
+    *,
+    read_timeout: int | None = None,
 ) -> dict[str, Any]:
     assert_neuraldeep_model(str(payload["model"]))
     url = f"{runtime.base_url}/chat/completions"
     client = await llm_client()
+    timeout_sec = read_timeout if read_timeout is not None else max(runtime.timeout_seconds, 120)
     try:
         response = await client.post(
             url,
             headers=_headers(runtime),
             json=payload,
-            timeout=http_timeout(max(runtime.timeout_seconds, 120)),
+            timeout=http_timeout(timeout_sec),
         )
     except httpx.TimeoutException as exc:
         raise LLMTimeoutError() from exc
@@ -140,6 +143,7 @@ async def complete_text(
     max_tokens: int,
     session_key: str,
     max_retries: int | None = None,
+    read_timeout: int | None = None,
 ) -> tuple[str, UsageInfo]:
     last_error: Exception | None = None
     retries = runtime.max_retries if max_retries is None else max_retries
@@ -154,6 +158,7 @@ async def complete_text(
                     "max_tokens": max_tokens,
                     "user": session_key,
                 },
+                read_timeout=read_timeout,
             )
             content = _message_text(payload).strip()
             if not content:
@@ -202,6 +207,7 @@ async def complete_structured(
     max_tokens: int,
     session_key: str,
     max_retries: int | None = None,
+    read_timeout: int | None = None,
 ) -> tuple[T, UsageInfo]:
     last_error: Exception | None = None
     working_messages = list(messages)
@@ -219,6 +225,7 @@ async def complete_structured(
                     "user": session_key,
                     "response_format": {"type": "json_object"},
                 },
+                read_timeout=read_timeout,
             )
             raw = _message_text(payload)
             parsed = schema.model_validate_json(_extract_json_object(raw))

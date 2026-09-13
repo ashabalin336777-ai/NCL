@@ -15,11 +15,13 @@ HISTORY_WINDOW = 10
 
 CLIENT_RUNTIME_RULES = """Ты — AI-клиент завода или КБ в РФ. Отвечай только репликой клиента (1–4 предложения), без мета-комментариев и скобок.
 Правила:
-1. Не раскрывай скрытую боль сразу. Давай зацепки, если менеджер компетентен.
-2. Шаблоны и давление — закрывайся. Вопросы про ОТК, логистику, аналоги — оттепель.
-3. «Покупка» = следующий шаг: BOM, встреча с инженером, NDA. Не перевод денег.
-4. Не соглашайся из вежливости, если риски не сняты.
-5. Не подтверждай обещания вне комплаенса."""
+1. Твоя личность ЖЁСТКО задана карточкой: company_name и contact_name. Это твоё настоящее имя и предприятие.
+2. Никогда не выдумывай другое ФИО, компанию, бренд или должность. Если представляешься — только contact_name и company_name из карточки.
+3. Не раскрывай скрытую боль сразу. Давай зацепки, если менеджер компетентен.
+4. Шаблоны и давление — закрывайся. Вопросы про ОТК, логистику, аналоги — оттепель.
+5. «Покупка» = следующий шаг: BOM, встреча с инженером, NDA. Не перевод денег.
+6. Не соглашайся из вежливости, если риски не сняты.
+7. Не подтверждай обещания вне комплаенса."""
 
 COMPLIANCE_FALLBACK = """- Не обещать поставку из Китая за 3 дня и 100% склад по всей номенклатуре.
 - Склад РФ — согласованный срок; Азия + ВЭД — недели, не дни.
@@ -111,8 +113,13 @@ def assemble_client_system(snapshot: dict[str, Any], card: HiddenClientCard) -> 
     bullets = format_knowledge_bullets(snapshot.get("knowledge_base") or [])
     return (
         f"{CLIENT_RUNTIME_RULES}\n\n"
+        f"# Твоя личность (обязательно)\n"
+        f"ФИО: {card.contact_name}\n"
+        f"Компания: {card.company_name}\n"
+        f"Должность: {card.role_title}\n"
+        f"Отрасль: {card.industry}\n\n"
         f"# Комплаенс\n{bullets}\n\n"
-        f"# Карточка\n{compact_card(card)}\n"
+        f"# Полная карточка\n{compact_card(card)}\n"
     )
 
 
@@ -128,6 +135,8 @@ def assemble_card_user_prompt(
         f"Роль: {CLIENT_ROLE_LABELS[client_role]} ({client_role.value})\n"
         f"Сложность: {DIFFICULTY_LABELS[difficulty]} ({difficulty.value})\n"
         f"Отрасль: {industry_line}\n"
+        "company_name и contact_name должны быть уникальными и реалистичными для РФ "
+        "(не используй шаблоны вроде «Андрей Морозов» / «НПО Сигнал», если это не уместно).\n"
         "Только JSON с ключами: company_name, contact_name, role_title, industry, product, "
         "hidden_pain, surface_request, previous_experience, initial_stance, trust_triggers, "
         "planned_objections, next_step_if_convinced. "
@@ -199,6 +208,43 @@ def assemble_hint_messages(
                 f"Комплаенс:\n{bullets}\n\n"
                 f"Диалог:\n{transcript}\n\n"
                 "Что спросить или предложить следующим сообщением?"
+            ),
+        },
+    ]
+
+
+def assemble_radar_messages(
+    *,
+    system_prompt: str,
+    card: HiddenClientCard,
+    context_messages: Sequence[Message],
+    manager_message: str,
+) -> list[dict[str, str]]:
+    history_lines: list[str] = []
+    for item in context_messages[-5:]:
+        speaker = "Менеджер" if item.role == MessageRole.USER else "Клиент"
+        history_lines.append(f"{speaker}: {item.content}")
+    history = "\n".join(history_lines) if history_lines else "(нет контекста)"
+    card_compact = json.dumps(
+        {
+            "role": card.role_title,
+            "industry": card.industry,
+            "product": card.product,
+            "hidden_pain": card.hidden_pain,
+            "surface": card.surface_request,
+            "stance": card.initial_stance,
+        },
+        ensure_ascii=False,
+    )
+    return [
+        {"role": "system", "content": system_prompt},
+        {
+            "role": "user",
+            "content": (
+                f"Карточка клиента:\n{card_compact}\n\n"
+                f"Контекст (до 5 реплик):\n{history}\n\n"
+                f"Реплика менеджера для оценки:\n{manager_message}\n\n"
+                "Верни только JSON с 6 ключами компетенций (0–100)."
             ),
         },
     ]

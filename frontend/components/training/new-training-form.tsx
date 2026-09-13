@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import type { ClientRole, Difficulty, TrainingCreateResponse } from "@/types/tra
 
 export function NewTrainingForm(): React.JSX.Element {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [clientRole, setClientRole] = useState<ClientRole>("chief_engineer");
   const [industry, setIndustry] = useState<string>("IoT");
@@ -32,6 +34,7 @@ export function NewTrainingForm(): React.JSX.Element {
           industry,
         }),
       });
+      queryClient.setQueryData(["training", training.id], training);
       router.push(`/trainings/${training.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Не удалось создать тренировку");

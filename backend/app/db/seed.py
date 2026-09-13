@@ -13,6 +13,7 @@ from app.db.seed_content import (
     CLIENT_SYSTEM_PROMPT,
     HINT_SYSTEM_PROMPT,
     KNOWLEDGE_ARTICLES,
+    RADAR_SYSTEM_PROMPT,
 )
 from app.services.ai_settings import DEFAULT_TARIFFS
 from app.models.ai_setting import AISetting
@@ -28,6 +29,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "card_model_id": "qwen3.6-fp8-noreason",
     "hint_model_id": "qwen3.6-fp8-noreason",
     "analyst_model_id": "qwen3.8-27b-noreason",
+    "radar_model_id": "qwen3.6-fp8-noreason",
     "cost_per_1k_input_tokens_rub": 0.02448,
     "cost_per_1k_output_tokens_rub": 0.122,
     "llm_timeout_seconds": settings.llm_timeout_seconds,
@@ -54,6 +56,7 @@ DEFAULT_PROMPTS: list[tuple[str, str]] = [
     ("terra_hint", HINT_SYSTEM_PROMPT),
     ("sol_analyst", ANALYST_SYSTEM_PROMPT),
     ("card_generator", CARD_SYSTEM_PROMPT),
+    ("radar_analyzer", RADAR_SYSTEM_PROMPT),
 ]
 
 
@@ -84,8 +87,13 @@ async def _ensure_setting(session: AsyncSession, key: str, value: Any) -> None:
     if row is None:
         session.add(AISetting(key=key, value=value))
         return
-    placeholders = PLACEHOLDER_SETTINGS.get(key, set())
-    if row.value in placeholders:
+    placeholders = PLACEHOLDER_SETTINGS.get(key)
+    if not placeholders:
+        return
+    current = row.value
+    if isinstance(current, (dict, list)):
+        return
+    if current in placeholders:
         row.value = value
 
 

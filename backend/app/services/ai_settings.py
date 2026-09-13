@@ -33,6 +33,7 @@ class AIRuntimeSettings(BaseModel):
     card_model_id: str
     hint_model_id: str
     analyst_model_id: str
+    radar_model_id: str
     timeout_seconds: int
     max_retries: int = 2
     default_input_rate: Decimal = Decimal("0.02448")
@@ -109,6 +110,9 @@ async def load_ai_settings(session: AsyncSession) -> AIRuntimeSettings:
         ),
         analyst_model_id=assert_neuraldeep_model(
             _as_str(stored.get("analyst_model_id"), "qwen3.8-27b-noreason")
+        ),
+        radar_model_id=assert_neuraldeep_model(
+            _as_str(stored.get("radar_model_id"), "qwen3.6-fp8-noreason")
         ),
         timeout_seconds=_as_int(stored.get("llm_timeout_seconds"), settings.llm_timeout_seconds),
         max_retries=settings.llm_max_retries,

@@ -29,6 +29,7 @@ MODEL_KEYS = {
     "card_model_id",
     "hint_model_id",
     "analyst_model_id",
+    "radar_model_id",
 }
 
 
