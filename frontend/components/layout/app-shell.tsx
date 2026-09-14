@@ -19,14 +19,14 @@ export function AppShell({ children }: { children: React.ReactNode }): React.JSX
 
   if (!hydrated || !user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 text-sm text-slate-500">
+      <div className="flex min-h-screen items-center justify-center bg-[#0B0F19] text-sm text-slate-400">
         Загрузка…
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-[#0B0F19]">
       <Sidebar />
       <main className="flex min-w-0 flex-1 flex-col">
         <div className="flex-1 overflow-auto p-6 md:p-8">{children}</div>

@@ -52,7 +52,7 @@ function NavSection({
   return (
     <div className="space-y-1">
       {title ? (
-        <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+        <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
           {title}
         </p>
       ) : null}
@@ -66,8 +66,8 @@ function NavSection({
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
               active
-                ? "bg-navy text-white"
-                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+                ? "bg-navy text-white shadow-[0_0_15px_rgba(249,115,22,0.3)]"
+                : "text-slate-300 hover:bg-white/5 hover:text-white",
             )}
           >
             <Icon className="h-4 w-4 shrink-0" />
@@ -93,10 +93,10 @@ export function Sidebar(): React.JSX.Element {
   }
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-5 py-5">
+    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-white/5 bg-slate-900/60 backdrop-blur-xl">
+      <div className="border-b border-white/5 px-5 py-5">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">NeuroCloser</p>
-        <h1 className="mt-1 text-lg font-semibold text-navy">NCL Sales Trainer</h1>
+        <h1 className="mt-1 text-lg font-semibold text-slate-100">NCL Sales Trainer</h1>
         <p className="mt-1 text-xs text-slate-500">Тренажёр дожатия сделок с ИИ</p>
       </div>
 
@@ -108,15 +108,19 @@ export function Sidebar(): React.JSX.Element {
         ) : null}
       </nav>
 
-      <div className="border-t border-slate-200 p-4">
+      <div className="border-t border-white/5 p-4">
         <div className="mb-3">
-          <p className="truncate text-sm font-medium text-slate-900">{user?.full_name}</p>
+          <p className="truncate text-sm font-medium text-slate-100">{user?.full_name}</p>
           <p className="truncate text-xs text-slate-500">{user?.email}</p>
           <p className="mt-1 text-[11px] uppercase tracking-wide text-accent">
             {user ? roleLabel(user.role) : ""}
           </p>
         </div>
-        <Button variant="outline" className="w-full" onClick={() => void onLogout()}>
+        <Button
+          variant="outline"
+          className="w-full border-white/10 bg-transparent text-slate-200 hover:bg-white/5 hover:text-white"
+          onClick={() => void onLogout()}
+        >
           <LogOut className="h-4 w-4" />
           Выйти
         </Button>

@@ -41,7 +41,7 @@ function ManagerInner(): React.JSX.Element {
         <Link href="/rop/analytics" className="text-sm text-accent hover:underline">
           ← К аналитике
         </Link>
-        <h2 className="mt-2 text-3xl font-semibold text-navy">
+        <h2 className="mt-2 text-3xl font-semibold text-slate-50">
           {stats?.manager_name ?? "Менеджер"}
         </h2>
         <p className="text-sm text-slate-500">{stats?.manager_email}</p>
@@ -52,7 +52,7 @@ function ManagerInner(): React.JSX.Element {
           <CardHeader>
             <CardTitle className="text-base">Тренировок</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold text-navy">
+          <CardContent className="font-mono text-2xl font-semibold text-slate-50">
             {stats?.trainings_total ?? "—"}
           </CardContent>
         </Card>
@@ -60,7 +60,7 @@ function ManagerInner(): React.JSX.Element {
           <CardHeader>
             <CardTitle className="text-base">Завершено</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold text-navy">
+          <CardContent className="font-mono text-2xl font-semibold text-slate-50">
             {stats?.trainings_completed ?? "—"}
           </CardContent>
         </Card>
@@ -68,7 +68,7 @@ function ManagerInner(): React.JSX.Element {
           <CardHeader>
             <CardTitle className="text-base">Средний балл</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold text-navy">
+          <CardContent className="font-mono text-2xl font-semibold text-slate-50">
             {stats?.average_overall_score ?? "—"}
           </CardContent>
         </Card>
@@ -76,7 +76,7 @@ function ManagerInner(): React.JSX.Element {
           <CardHeader>
             <CardTitle className="text-base">Расход AI</CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-semibold text-navy">
+          <CardContent className="font-mono text-2xl font-semibold text-slate-50">
             {stats ? `${Number(stats.total_cost_rub).toFixed(2)} ₽` : "—"}
           </CardContent>
         </Card>
@@ -96,13 +96,13 @@ function ManagerInner(): React.JSX.Element {
                   ? `/trainings/analysis/${item.id}`
                   : `/trainings/${item.id}`
               }
-              className="flex justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm hover:bg-slate-50"
+              className="flex justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 text-sm transition hover:border-accent/40 hover:bg-white/[0.04]"
             >
-              <span>
+              <span className="text-slate-300">
                 {new Date(item.created_at).toLocaleString("ru-RU")} · {item.status}
               </span>
               <div className="text-right">
-                <span className="font-semibold text-navy">
+                <span className="font-semibold text-slate-50">
                   {item.overall_score != null ? `${item.overall_score}/10` : "—"}
                 </span>
                 <p className="text-xs font-medium text-slate-500">

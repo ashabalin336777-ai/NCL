@@ -72,9 +72,9 @@ function LoginForm(): React.JSX.Element {
             />
           </div>
           {error ? (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+            <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>
           ) : null}
-          <Button className="w-full" type="submit" disabled={loading}>
+          <Button className="w-full shadow-[0_0_15px_rgba(249,115,22,0.3)]" variant="accent" type="submit" disabled={loading}>
             {loading ? "Входим…" : "Войти"}
           </Button>
         </form>
@@ -89,10 +89,10 @@ function LoginForm(): React.JSX.Element {
 
 export default function LoginPage(): React.JSX.Element {
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(30,58,138,0.12),_transparent_40%),radial-gradient(circle_at_bottom_right,_rgba(249,115,22,0.14),_transparent_35%)]" />
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0B0F19] px-4 py-10">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(30,58,138,0.28),_transparent_40%),radial-gradient(circle_at_bottom_right,_rgba(249,115,22,0.18),_transparent_35%)]" />
       <div className="relative z-10 w-full max-w-md">
-        <Suspense fallback={<div className="text-sm text-slate-500">Загрузка…</div>}>
+        <Suspense fallback={<div className="text-sm text-slate-400">Загрузка…</div>}>
           <LoginForm />
         </Suspense>
       </div>

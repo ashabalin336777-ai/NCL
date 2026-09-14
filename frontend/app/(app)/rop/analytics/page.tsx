@@ -17,11 +17,35 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { apiFetch } from "@/lib/api";
 import type { StatsSeriesPoint, TeamStats, TrainingListItem } from "@/types/api";
 
+function GlassTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ value?: number; name?: string }>;
+  label?: string;
+}): React.JSX.Element | null {
+  if (!active || !payload?.length) {
+    return null;
+  }
+  return (
+    <div className="rounded-xl border border-white/10 bg-slate-900/80 px-3 py-2 text-xs text-slate-100 shadow-glow-accent backdrop-blur-md">
+      <p className="mb-1 font-medium text-slate-300">{label}</p>
+      {payload.map((item) => (
+        <p key={item.name}>
+          {item.name}: <span className="font-mono font-semibold">{item.value ?? "—"}</span>
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function Stat({ label, value }: { label: string; value: string }): React.JSX.Element {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-navy">{value}</p>
+    <div className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3">
+      <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 font-mono text-2xl font-semibold text-slate-50">{value}</p>
     </div>
   );
 }
@@ -59,8 +83,8 @@ function AnalyticsInner(): React.JSX.Element {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <div>
         <p className="text-sm font-medium text-accent">Админка РОПа</p>
-        <h2 className="mt-1 text-3xl font-semibold text-navy">Аналитика команды</h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <h2 className="mt-1 text-3xl font-semibold text-slate-50">Аналитика команды</h2>
+        <p className="mt-2 text-sm text-slate-400">
           Прогресс тренировок менеджеров и динамика среднего балла Sol.
         </p>
       </div>
@@ -91,11 +115,11 @@ function AnalyticsInner(): React.JSX.Element {
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="period" tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, 10]} tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Line type="monotone" dataKey="score" name="Балл" stroke="#0f2744" strokeWidth={2} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+                <XAxis dataKey="period" tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis domain={[0, 10]} tick={{ fill: "#94a3b8", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<GlassTooltip />} cursor={{ stroke: "rgba(249,115,22,0.35)" }} />
+                <Line type="monotone" dataKey="score" name="Балл" stroke="#F97316" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           )}
@@ -112,14 +136,14 @@ function AnalyticsInner(): React.JSX.Element {
             <Link
               key={manager.manager_id ?? manager.manager_email}
               href={`/rop/managers/${manager.manager_id}`}
-              className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 transition hover:border-navy/30 hover:bg-navy-50"
+              className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 transition hover:border-accent/40 hover:bg-white/[0.04]"
             >
               <div>
-                <p className="font-medium text-slate-900">{manager.manager_name}</p>
+                <p className="font-medium text-slate-100">{manager.manager_name}</p>
                 <p className="text-xs text-slate-500">{manager.manager_email}</p>
               </div>
               <div className="text-right text-sm">
-                <p className="font-semibold text-navy">
+                <p className="font-semibold text-slate-50">
                   {manager.average_overall_score != null
                     ? `${manager.average_overall_score}/10`
                     : "без оценки"}
@@ -146,10 +170,10 @@ function AnalyticsInner(): React.JSX.Element {
                   ? `/trainings/analysis/${item.id}`
                   : `/trainings/${item.id}`
               }
-              className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-sm hover:bg-slate-50"
+              className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 text-sm transition hover:border-accent/40 hover:bg-white/[0.04]"
             >
               <div>
-                <p className="font-medium text-slate-900">
+                <p className="font-medium text-slate-100">
                   {item.manager_name ?? "Менеджер"} · {item.difficulty}
                 </p>
                 <p className="text-xs text-slate-500">
@@ -158,7 +182,7 @@ function AnalyticsInner(): React.JSX.Element {
                 </p>
               </div>
               <div className="text-right">
-                <span className="font-semibold text-navy">
+                <span className="font-semibold text-slate-50">
                   {item.overall_score != null ? `${item.overall_score}/10` : "—"}
                 </span>
                 <p className="text-xs font-medium text-slate-500">

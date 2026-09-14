@@ -54,8 +54,8 @@ function ReportsInner(): React.JSX.Element {
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6">
       <div>
         <p className="text-sm font-medium text-accent">Админка РОПа</p>
-        <h2 className="mt-1 text-3xl font-semibold text-navy">Отчёты руководству</h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <h2 className="mt-1 text-3xl font-semibold text-slate-50">Отчёты руководству</h2>
+        <p className="mt-2 text-sm text-slate-400">
           Сводка за период и выгрузка CSV для презентации руководству.
         </p>
       </div>
@@ -65,7 +65,7 @@ function ReportsInner(): React.JSX.Element {
           <CardTitle>Сводка сейчас</CardTitle>
           <CardDescription>Агрегаты по всей команде менеджеров</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 text-sm md:grid-cols-2">
+        <CardContent className="grid gap-3 text-sm text-slate-300 md:grid-cols-2">
           <p>Тренировок: <strong>{team?.trainings_total ?? "—"}</strong></p>
           <p>Завершено: <strong>{team?.trainings_completed ?? "—"}</strong></p>
           <p>Завершение: <strong>{team ? `${team.completion_rate}%` : "—"}</strong></p>
@@ -83,7 +83,7 @@ function ReportsInner(): React.JSX.Element {
           </p>
           <div className="md:col-span-2">
             <p className="mb-1 font-medium">Исходы:</p>
-            <ul className="list-inside list-disc text-slate-600">
+            <ul className="list-inside list-disc text-slate-400">
               {Object.entries(team?.outcomes ?? {}).map(([key, value]) => (
                 <li key={key}>
                   {key}: {value}

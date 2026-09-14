@@ -55,13 +55,14 @@ export function HintsPanel({
             ordered.map((hint) => (
               <div
                 key={hint.id}
-                className="rounded-xl border border-orange-100 bg-accent-50 px-3 py-3 text-sm leading-6 text-slate-800"
+                className="rounded-xl border border-accent/20 bg-accent/10 px-3 py-3 text-sm leading-6 text-slate-100"
               >
                 <CollapsibleBlock
                   title={`Terra · ${new Date(hint.created_at).toLocaleTimeString("ru-RU")}`}
                   text={hint.response_text}
                   defaultCollapsed={hint.id !== latestId}
                   titleClassName="font-semibold text-accent opacity-100"
+                  bodyClassName="text-slate-100"
                   collapseAfterChars={120}
                 />
               </div>

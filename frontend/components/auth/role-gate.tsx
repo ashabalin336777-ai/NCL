@@ -39,9 +39,9 @@ export function RoleGate({
 
   if (!allowed) {
     return (
-      <div className="mx-auto max-w-lg rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-950">
+      <div className="mx-auto max-w-lg rounded-xl border border-amber-500/20 bg-amber-500/10 p-6 text-sm text-amber-100">
         <p className="font-medium">Раздел недоступен для роли «{roleLabel(user.role)}».</p>
-        <p className="mt-2 text-amber-800">
+        <p className="mt-2 text-amber-200/80">
           Нужна роль: {allow.map(roleLabel).join(" / ")}. Сейчас откроется дашборд…
         </p>
       </div>

@@ -3,17 +3,62 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
+  --background: 11 15 25;
+  --foreground: 226 232 240;
+  --card: 15 23 42;
+  --card-foreground: 226 232 240;
+  --muted: 30 41 59;
+  --muted-foreground: 148 163 184;
+  --border: 255 255 255;
+  --input: 255 255 255;
+  --ring: 30 58 138;
+  --primary: 30 58 138;
+  --primary-foreground: 255 255 255;
+  --accent: 249 115 22;
+  --accent-foreground: 255 255 255;
   --navy: #1e3a8a;
-  --accent: #f97316;
+  --accent-hex: #f97316;
 }
 
 * {
-  border-color: theme("colors.border");
+  border-color: rgb(var(--border) / 0.08);
 }
 
 body {
   @apply min-h-screen bg-background font-sans text-foreground antialiased;
+  background-color: #0b0f19;
+  color: rgb(var(--foreground));
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]),
+textarea,
+select {
+  color-scheme: dark;
+  color: #e2e8f0;
+  -webkit-text-fill-color: #e2e8f0;
+  caret-color: #f97316;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #64748b;
+  -webkit-text-fill-color: #64748b;
+  opacity: 1;
+}
+
+/* Paste from Terra/hints often brings HTML color:black; beat UA + overlay styles. */
+.ncl-composer-input,
+.ncl-composer-input * {
+  color: #e2e8f0 !important;
+  -webkit-text-fill-color: #e2e8f0 !important;
+  caret-color: #f97316 !important;
+  background-color: #0b1220 !important;
+}
+
+.ncl-composer-input::placeholder {
+  color: #64748b !important;
+  -webkit-text-fill-color: #64748b !important;
 }
 
 ::-webkit-scrollbar {
@@ -21,9 +66,17 @@ body {
   height: 10px;
 }
 
+::-webkit-scrollbar-track {
+  background: #0b0f19;
+}
+
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #334155;
   border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
 }
 
 @keyframes ncl-typing-bounce {
@@ -43,7 +96,7 @@ body {
   width: 0.45rem;
   height: 0.45rem;
   border-radius: 9999px;
-  background: #1e3a8a;
+  background: #f97316;
   animation: ncl-typing-bounce 1.2s ease-in-out infinite;
 }
 
@@ -54,4 +107,3 @@ body {
 .ncl-typing-dot:nth-child(3) {
   animation-delay: 0.3s;
 }
-

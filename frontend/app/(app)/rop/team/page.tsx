@@ -73,8 +73,8 @@ function TeamInner(): React.JSX.Element {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div>
         <p className="text-sm font-medium text-accent">Админка РОПа</p>
-        <h2 className="mt-1 text-3xl font-semibold text-navy">Команда</h2>
-        <p className="mt-2 text-sm text-slate-600">CRUD менеджеров вашей команды.</p>
+        <h2 className="mt-1 text-3xl font-semibold text-slate-50">Команда</h2>
+        <p className="mt-2 text-sm text-slate-400">CRUD менеджеров вашей команды.</p>
       </div>
 
       <Card>
@@ -111,7 +111,7 @@ function TeamInner(): React.JSX.Element {
             >
               Создать
             </Button>
-            {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+            {error ? <p className="mt-2 text-sm text-red-300">{error}</p> : null}
           </div>
         </CardContent>
       </Card>
@@ -125,10 +125,10 @@ function TeamInner(): React.JSX.Element {
           {managers.map((user) => (
             <div
               key={user.id}
-              className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3"
+              className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3"
             >
               <div>
-                <p className="font-medium text-slate-900">{user.full_name}</p>
+                <p className="font-medium text-slate-100">{user.full_name}</p>
                 <p className="text-xs text-slate-500">{user.email}</p>
               </div>
               <div className="flex items-center gap-3 text-sm">

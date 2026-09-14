@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, apiFetch } from "@/lib/api";
 import { roleLabel } from "@/lib/roles";
+import { fieldSelectClass } from "@/lib/utils";
 import type { User, UserRole } from "@/types/api";
 
 export default function DevUsersPage(): React.JSX.Element {
@@ -73,8 +74,8 @@ function UsersInner(): React.JSX.Element {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div>
         <p className="text-sm font-medium text-accent">Админка разработчика</p>
-        <h2 className="mt-1 text-3xl font-semibold text-navy">Пользователи</h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <h2 className="mt-1 text-3xl font-semibold text-slate-50">Пользователи</h2>
+        <p className="mt-2 text-sm text-slate-400">
           Создание РОПа, менеджеров и других developer-аккаунтов.
         </p>
       </div>
@@ -110,7 +111,7 @@ function UsersInner(): React.JSX.Element {
             <Label htmlFor="role">Роль</Label>
             <select
               id="role"
-              className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+              className={fieldSelectClass}
               value={role}
               onChange={(e) => setRole(e.target.value as UserRole)}
             >
@@ -132,7 +133,7 @@ function UsersInner(): React.JSX.Element {
             >
               Создать
             </Button>
-            {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+            {error ? <p className="mt-2 text-sm text-red-300">{error}</p> : null}
           </div>
         </CardContent>
       </Card>
@@ -146,14 +147,14 @@ function UsersInner(): React.JSX.Element {
           {(query.data ?? []).map((user) => (
             <div
               key={user.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3"
             >
               <div>
-                <p className="font-medium text-slate-900">{user.full_name}</p>
+                <p className="font-medium text-slate-100">{user.full_name}</p>
                 <p className="text-xs text-slate-500">{user.email}</p>
               </div>
               <div className="flex items-center gap-3 text-sm">
-                <span className="font-medium text-navy">{roleLabel(user.role)}</span>
+                <span className="font-medium text-slate-100">{roleLabel(user.role)}</span>
                 <span className="text-xs text-slate-500">
                   {user.is_active ? "активен" : "отключён"}
                 </span>

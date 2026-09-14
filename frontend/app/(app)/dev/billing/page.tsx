@@ -60,8 +60,8 @@ function BillingInner(): React.JSX.Element {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div>
         <p className="text-sm font-medium text-accent">Админка разработчика</p>
-        <h2 className="mt-1 text-3xl font-semibold text-navy">Баланс проекта</h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <h2 className="mt-1 text-3xl font-semibold text-slate-50">Баланс проекта</h2>
+        <p className="mt-2 text-sm text-slate-400">
           Ручное пополнение. ЮKassa — следующим этапом. Списания идут за карточку, диалог, Terra,
           радар и Sol.
         </p>
@@ -74,7 +74,7 @@ function BillingInner(): React.JSX.Element {
             <CardDescription>Единый счёт инстанса</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-semibold text-navy">
+            <p className="font-mono text-3xl font-semibold text-slate-50">
               {account ? `${Number(account.balance_rub).toFixed(2)} ₽` : "—"}
             </p>
             <p className="mt-2 text-xs text-slate-500">
@@ -118,7 +118,7 @@ function BillingInner(): React.JSX.Element {
                 Зачислить
               </Button>
             </div>
-            {error ? <p className="text-sm text-red-600 md:col-span-3">{error}</p> : null}
+            {error ? <p className="text-sm text-red-300 md:col-span-3">{error}</p> : null}
           </CardContent>
         </Card>
       </div>
@@ -135,10 +135,10 @@ function BillingInner(): React.JSX.Element {
             (ledgerQuery.data ?? []).map((item) => (
               <div
                 key={item.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-4 py-3 text-sm"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3 text-sm"
               >
                 <div>
-                  <p className="font-medium text-slate-900">
+                  <p className="font-medium text-slate-100">
                     {item.type} · {item.reason}
                   </p>
                   <p className="text-xs text-slate-500">
@@ -150,8 +150,8 @@ function BillingInner(): React.JSX.Element {
                   <p
                     className={
                       Number(item.amount_rub) >= 0
-                        ? "font-semibold text-emerald-700"
-                        : "font-semibold text-red-700"
+                        ? "font-semibold text-emerald-400"
+                        : "font-semibold text-red-400"
                     }
                   >
                     {Number(item.amount_rub) >= 0 ? "+" : ""}

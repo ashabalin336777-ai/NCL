@@ -1,12 +1,12 @@
-import { Manrope } from "next/font/google";
+import { Inter } from "next/font/google";
 import type { Metadata } from "next";
 
 import { Providers } from "@/components/providers";
 import "./globals.css";
 
-const manrope = Manrope({
+const inter = Inter({
   subsets: ["latin", "cyrillic"],
-  variable: "--font-manrope",
+  variable: "--font-sans",
   display: "swap",
 });
 
@@ -21,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>): React.JSX.Element {
   return (
-    <html lang="ru">
-      <body className={manrope.variable}>
+    <html lang="ru" className="dark">
+      <body className={inter.variable}>
         <Providers>{children}</Providers>
       </body>
     </html>

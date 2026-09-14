@@ -64,7 +64,7 @@ export function CollapsibleBlock({
             onClick={() => setCollapsed((value) => !value)}
             className={cn(
               "inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium opacity-80 transition hover:opacity-100",
-              toggleClassName ?? "hover:bg-black/5",
+              toggleClassName ?? "hover:bg-white/5",
             )}
             title={collapsed ? "Развернуть" : "Свернуть"}
             aria-expanded={!collapsed}
@@ -83,7 +83,7 @@ export function CollapsibleBlock({
           </button>
         ) : null}
       </div>
-      <p className={cn("whitespace-pre-wrap", bodyClassName)}>
+      <p className={cn("whitespace-pre-wrap text-slate-100", bodyClassName)}>
         {showCollapsed ? `${preview}…` : text}
       </p>
     </div>

@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, apiFetch } from "@/lib/api";
+import { fieldTextareaClass } from "@/lib/utils";
 import type { AISetting } from "@/types/api";
 
 const SETTING_LABELS: Record<string, string> = {
@@ -161,8 +162,8 @@ function SettingsInner(): React.JSX.Element {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div>
         <p className="text-sm font-medium text-accent">Админка разработчика</p>
-        <h2 className="mt-1 text-3xl font-semibold text-navy">AI-настройки и тарифы</h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <h2 className="mt-1 text-3xl font-semibold text-slate-50">AI-настройки и тарифы</h2>
+        <p className="mt-2 text-sm text-slate-400">
           `model_tariffs` — себестоимость NeuralDEEP. Клиенту (менеджер/РОП) начисляется{" "}
           <strong>себестоимость × множитель</strong> за каждый вызов LLM.
         </p>
@@ -172,7 +173,7 @@ function SettingsInner(): React.JSX.Element {
         <p className="text-sm text-slate-500">Загрузка настроек…</p>
       ) : null}
       {query.isError ? (
-        <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">
           Не удалось загрузить настройки:{" "}
           {query.error instanceof ApiError ? query.error.message : "ошибка API"}
         </p>
@@ -226,14 +227,14 @@ function SettingsInner(): React.JSX.Element {
             <Label htmlFor="tariffs">model_tariffs — себестоимость NeuralDEEP (JSON)</Label>
             <textarea
               id="tariffs"
-              className="min-h-[220px] w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs"
+              className={`${fieldTextareaClass} min-h-[220px] font-mono text-xs`}
               value={tariffsJson}
               onChange={(e) => setTariffsJson(e.target.value)}
             />
           </div>
           <div className="grid gap-1">
             <Label>Тариф для клиента (превью: база × {Number.isFinite(markup) ? markup : 15})</Label>
-            <pre className="max-h-56 overflow-auto rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700">
+            <pre className="max-h-56 overflow-auto rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 font-mono text-xs text-slate-300">
               {customerPreview}
             </pre>
           </div>
@@ -244,8 +245,8 @@ function SettingsInner(): React.JSX.Element {
             >
               Сохранить
             </Button>
-            {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            {message ? <p className="text-sm text-emerald-400">{message}</p> : null}
+            {error ? <p className="text-sm text-red-300">{error}</p> : null}
           </div>
         </CardContent>
       </Card>

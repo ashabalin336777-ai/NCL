@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { ApiError, apiFetch } from "@/lib/api";
+import { fieldTextareaClass } from "@/lib/utils";
 import type { PromptItem } from "@/types/api";
 
 const PROMPT_NAMES = [
@@ -94,8 +95,8 @@ function PromptsInner(): React.JSX.Element {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div>
         <p className="text-sm font-medium text-accent">Админка разработчика</p>
-        <h2 className="mt-1 text-3xl font-semibold text-navy">Промпты</h2>
-        <p className="mt-2 text-sm text-slate-600">
+        <h2 className="mt-1 text-3xl font-semibold text-slate-50">Промпты</h2>
+        <p className="mt-2 text-sm text-slate-400">
           Версионирование system-промптов. Новая версия при сохранении активируется сразу.
         </p>
       </div>
@@ -129,7 +130,7 @@ function PromptsInner(): React.JSX.Element {
             <Label htmlFor="prompt">system_prompt_text</Label>
             <textarea
               id="prompt"
-              className="mt-1 min-h-[320px] w-full rounded-lg border border-slate-200 px-3 py-2 font-mono text-xs leading-5"
+              className={`${fieldTextareaClass} mt-1 min-h-[320px] font-mono text-xs leading-5`}
               value={text}
               onChange={(e) => setText(e.target.value)}
             />
@@ -141,15 +142,15 @@ function PromptsInner(): React.JSX.Element {
             >
               Сохранить как новую версию
             </Button>
-            {message ? <p className="text-sm text-emerald-700">{message}</p> : null}
-            {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            {message ? <p className="text-sm text-emerald-400">{message}</p> : null}
+            {error ? <p className="text-sm text-red-300">{error}</p> : null}
           </div>
           <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-700">История версий</p>
+            <p className="text-sm font-medium text-slate-300">История версий</p>
             {versions.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2 text-sm text-slate-200"
               >
                 <span>
                   v{item.version}

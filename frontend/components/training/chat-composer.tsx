@@ -227,6 +227,24 @@ export function ChatComposer({ disabled, sending, onSend }: ChatComposerProps): 
     }
   }
 
+  function applyText(next: string): void {
+    setText(next);
+    if (!listening) {
+      baseTextRef.current = next;
+    }
+  }
+
+  function insertPlainAtCursor(el: HTMLTextAreaElement, chunk: string): void {
+    const start = el.selectionStart ?? text.length;
+    const end = el.selectionEnd ?? text.length;
+    const next = `${text.slice(0, start)}${chunk}${text.slice(end)}`;
+    applyText(next);
+    requestAnimationFrame(() => {
+      const pos = start + chunk.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
+
   async function submit(event?: FormEvent): Promise<void> {
     event?.preventDefault();
     if (listening || transcribing) {
@@ -249,19 +267,23 @@ export function ChatComposer({ disabled, sending, onSend }: ChatComposerProps): 
   }
 
   return (
-    <form className="rounded-2xl border border-slate-200 bg-white p-3" onSubmit={(e) => void submit(e)}>
+    <form className="rounded-2xl border border-white/5 bg-slate-900/60 p-3 backdrop-blur-xl" onSubmit={(e) => void submit(e)}>
       <textarea
         value={text}
-        onChange={(event) => {
-          setText(event.target.value);
-          if (!listening) {
-            baseTextRef.current = event.target.value;
+        onChange={(event) => applyText(event.target.value)}
+        onPaste={(event) => {
+          const plain = event.clipboardData?.getData("text/plain");
+          if (plain == null) {
+            return;
           }
+          event.preventDefault();
+          insertPlainAtCursor(event.currentTarget, plain);
         }}
         disabled={disabled || sending || listening || transcribing}
         rows={3}
+        spellCheck
         placeholder="Ваша реплика менеджеру… Цель — следующий шаг: BOM, встреча, NDA."
-        className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-navy focus:ring-2 focus:ring-navy/20"
+        className="ncl-composer-input w-full resize-none rounded-xl border border-white/10 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-accent/40 focus:ring-2 focus:ring-accent/30"
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
@@ -285,14 +307,14 @@ export function ChatComposer({ disabled, sending, onSend }: ChatComposerProps): 
             {transcribing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
             {voiceHint ? <span className="font-normal text-slate-500">· {voiceHint}</span> : null}
           </div>
-          <p className="mt-1 min-h-6 text-sm leading-6 text-slate-700">
+          <p className="mt-1 min-h-6 text-sm leading-6 text-slate-300">
             {liveLine ? (
               <>
-                <span className={cn("font-medium text-navy", listening && "animate-pulse")}>
+                <span className={cn("font-medium text-slate-100", listening && "animate-pulse")}>
                   {liveLine}
                 </span>
                 {listening || transcribing ? (
-                  <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-navy align-middle" />
+                  <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-accent align-middle" />
                 ) : null}
               </>
             ) : (
@@ -306,7 +328,7 @@ export function ChatComposer({ disabled, sending, onSend }: ChatComposerProps): 
       ) : null}
 
       {voiceError ? (
-        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">{voiceError}</p>
+        <p className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">{voiceError}</p>
       ) : null}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">

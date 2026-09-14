@@ -2,14 +2,14 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-export function Card({
+export function GlassCard({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element {
   return (
     <div
       className={cn(
-        "rounded-2xl border border-white/5 bg-slate-900/60 shadow-soft backdrop-blur-xl",
+        "rounded-2xl border border-white/5 bg-slate-900/60 backdrop-blur-xl",
         "transition-colors hover:border-accent/40",
         className,
       )}
@@ -18,14 +18,14 @@ export function Card({
   );
 }
 
-export function CardHeader({
+export function GlassCardHeader({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element {
   return <div className={cn("flex flex-col gap-1.5 p-6 pb-3", className)} {...props} />;
 }
 
-export function CardTitle({
+export function GlassCardTitle({
   className,
   ...props
 }: React.HTMLAttributes<HTMLHeadingElement>): React.JSX.Element {
@@ -34,14 +34,14 @@ export function CardTitle({
   );
 }
 
-export function CardDescription({
+export function GlassCardDescription({
   className,
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>): React.JSX.Element {
   return <p className={cn("text-sm text-slate-400", className)} {...props} />;
 }
 
-export function CardContent({
+export function GlassCardContent({
   className,
   ...props
 }: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element {

@@ -302,8 +302,8 @@ export default function TrainingSessionPage(): React.JSX.Element {
   if (!training) {
     return (
       <div className="mx-auto max-w-xl">
-        <p className="text-sm text-slate-600">Тренировка не найдена.</p>
-        <Link href="/trainings" className="text-sm text-navy underline">
+        <p className="text-sm text-slate-400">Тренировка не найдена.</p>
+        <Link href="/trainings" className="text-sm text-accent underline">
           К списку
         </Link>
       </div>
@@ -323,13 +323,13 @@ export default function TrainingSessionPage(): React.JSX.Element {
           <CardContent className="flex flex-wrap gap-3">
             <Link
               href={`/trainings/analysis/${training.id}`}
-              className="inline-flex h-10 items-center rounded-lg bg-navy px-4 text-sm font-medium text-white"
+              className="inline-flex h-10 items-center rounded-lg bg-accent px-4 text-sm font-medium text-white shadow-[0_0_15px_rgba(249,115,22,0.3)] hover:bg-accent-600"
             >
               Открыть разбор
             </Link>
             <Link
               href="/trainings"
-              className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-4 text-sm"
+              className="inline-flex h-10 items-center rounded-lg border border-white/10 bg-white/5 px-4 text-sm text-slate-100 hover:border-accent/40"
             >
               К списку
             </Link>
@@ -344,12 +344,12 @@ export default function TrainingSessionPage(): React.JSX.Element {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-accent">Переговоры</p>
-          <h2 className="text-2xl font-semibold text-navy">
+          <h2 className="text-2xl font-semibold text-slate-50">
             {training.client_brief
               ? `${training.client_brief.company_name} · ${training.client_brief.contact_name}`
               : `${DIFFICULTY_LABELS[training.difficulty]} · ${CLIENT_ROLE_LABELS[training.client_role]}`}
           </h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-slate-400">
             {DIFFICULTY_LABELS[training.difficulty]} ·{" "}
             {CLIENT_ROLE_LABELS[training.client_role]}
             {training.client_brief?.industry ? ` · ${training.client_brief.industry}` : ""}
@@ -383,7 +383,7 @@ export default function TrainingSessionPage(): React.JSX.Element {
       </div>
 
       {error ? (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <p className="rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">{error}</p>
       ) : null}
 
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[1.6fr_0.9fr]">

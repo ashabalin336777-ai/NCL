@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, apiFetch } from "@/lib/api";
+import { fieldTextareaClass } from "@/lib/utils";
 import type { KnowledgeArticle } from "@/types/api";
 
 export default function DevKnowledgePage(): React.JSX.Element {
@@ -72,7 +73,7 @@ function KnowledgeInner(): React.JSX.Element {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
       <div>
         <p className="text-sm font-medium text-accent">Админка разработчика</p>
-        <h2 className="mt-1 text-3xl font-semibold text-navy">База знаний</h2>
+        <h2 className="mt-1 text-3xl font-semibold text-slate-50">База знаний</h2>
       </div>
 
       <Card>
@@ -88,7 +89,7 @@ function KnowledgeInner(): React.JSX.Element {
             <Label htmlFor="content">Текст</Label>
             <textarea
               id="content"
-              className="mt-1 min-h-[140px] w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+              className={`${fieldTextareaClass} mt-1 min-h-[140px]`}
               value={content}
               onChange={(e) => setContent(e.target.value)}
             />
@@ -106,7 +107,7 @@ function KnowledgeInner(): React.JSX.Element {
               </Button>
             ) : null}
           </div>
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="text-sm text-red-300">{error}</p> : null}
         </CardContent>
       </Card>
 
@@ -120,7 +121,7 @@ function KnowledgeInner(): React.JSX.Element {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
+              <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300">
                 {article.content}
               </p>
               <div className="flex gap-2">

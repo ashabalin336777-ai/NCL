@@ -61,7 +61,7 @@ export function ChatMessages({
   }, [messages.length, pendingAssistant, sending]);
 
   return (
-    <div className="flex h-full flex-col gap-3 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4">
+    <div className="flex h-full flex-col gap-3 overflow-y-auto rounded-2xl border border-white/5 bg-slate-900/40 p-4">
       {messages.map((message) => {
         const isLatest = message.id === lastId && !pendingAssistant;
         return (
@@ -70,8 +70,8 @@ export function ChatMessages({
             className={cn(
               "max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6",
               message.role === "user"
-                ? "ml-auto bg-navy text-white"
-                : "mr-auto border border-slate-200 bg-slate-50 text-slate-800",
+                ? "ml-auto bg-navy text-white shadow-[0_0_15px_rgba(30,58,138,0.35)]"
+                : "mr-auto border border-white/10 bg-white/5 text-slate-100",
             )}
           >
             <CollapsibleBlock
@@ -79,10 +79,10 @@ export function ChatMessages({
               text={message.content}
               defaultCollapsed={!isLatest}
               uppercaseTitle={false}
-              titleClassName={message.role === "user" ? "text-white/80" : undefined}
-              bodyClassName={message.role === "user" ? "text-white" : undefined}
+              titleClassName={message.role === "user" ? "text-white/80" : "text-slate-400"}
+              bodyClassName={message.role === "user" ? "text-white" : "text-slate-100"}
               toggleClassName={
-                message.role === "user" ? "text-white/90 hover:bg-white/10" : "hover:bg-black/5"
+                message.role === "user" ? "text-white/90 hover:bg-white/10" : "hover:bg-white/5"
               }
             />
           </div>
@@ -90,7 +90,7 @@ export function ChatMessages({
       })}
 
       {pendingAssistant ? (
-        <div className="mr-auto max-w-[85%] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-800">
+        <div className="mr-auto max-w-[85%] rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm leading-6 text-slate-100">
           <CollapsibleBlock
             title={assistantLabel}
             text={pendingAssistant}
@@ -102,7 +102,7 @@ export function ChatMessages({
 
       {sending && !pendingAssistant ? (
         <div
-          className="mr-auto max-w-[85%] rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm"
+          className="mr-auto max-w-[85%] rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
           aria-live="polite"
           aria-label={typingLabel}
         >
@@ -110,12 +110,12 @@ export function ChatMessages({
             {assistantLabel}
           </p>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 rounded-full bg-white px-3 py-2 ring-1 ring-slate-200">
+            <div className="flex items-center gap-1.5 rounded-full bg-slate-950/60 px-3 py-2 ring-1 ring-white/10">
               <span className="ncl-typing-dot" />
               <span className="ncl-typing-dot" />
               <span className="ncl-typing-dot" />
             </div>
-            <p className="text-sm font-medium text-slate-600">{firstName} печатает</p>
+            <p className="text-sm font-medium text-slate-300">{firstName} печатает</p>
           </div>
         </div>
       ) : null}

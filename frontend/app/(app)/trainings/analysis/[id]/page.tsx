@@ -15,9 +15,9 @@ import type { Analysis, Training } from "@/types/training";
 
 function Score({ label, value }: { label: string; value: number }): React.JSX.Element {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-      <p className="text-xs uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-navy">{value}/10</p>
+    <div className="rounded-xl border border-white/5 bg-white/[0.03] px-4 py-3">
+      <p className="text-xs uppercase tracking-wide text-slate-400">{label}</p>
+      <p className="mt-1 font-mono text-2xl font-semibold text-slate-50">{value}/10</p>
     </div>
   );
 }
@@ -66,17 +66,17 @@ export default function TrainingAnalysisPage(): React.JSX.Element {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-accent">Анализ Sol</p>
-          <h2 className="mt-1 text-3xl font-semibold text-navy">Разбор полётов</h2>
+          <h2 className="mt-1 text-3xl font-semibold text-slate-50">Разбор полётов</h2>
           {training ? (
             <>
-              <p className="mt-2 text-sm font-medium text-slate-800">
+              <p className="mt-2 text-sm font-medium text-slate-100">
                 {training.client_brief
                   ? `${training.client_brief.company_name} · ${training.client_brief.contact_name}`
                   : training.hidden_card
                     ? `${training.hidden_card.company_name} · ${training.hidden_card.contact_name}`
                     : null}
               </p>
-              <p className="mt-1 text-sm text-slate-600">
+              <p className="mt-1 text-sm text-slate-400">
                 {DIFFICULTY_LABELS[training.difficulty]} ·{" "}
                 {CLIENT_ROLE_LABELS[training.client_role]}
               </p>
@@ -85,7 +85,7 @@ export default function TrainingAnalysisPage(): React.JSX.Element {
         </div>
         <Link
           href={`/trainings/${params.id}`}
-          className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm"
+          className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-4 text-sm text-slate-100 hover:border-accent/40"
         >
           <ArrowLeft className="h-4 w-4" />
           К сессии
@@ -119,7 +119,7 @@ export default function TrainingAnalysisPage(): React.JSX.Element {
           {finished ? (
             <CardContent className="space-y-3">
               {runAnalysis.isError ? (
-                <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <p className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
                   {runAnalysis.error instanceof ApiError
                     ? runAnalysis.error.message
                     : "Не удалось запустить анализ"}
@@ -158,7 +158,7 @@ export default function TrainingAnalysisPage(): React.JSX.Element {
                   "—"}
               </CardDescription>
             </CardHeader>
-            <CardContent className="text-sm leading-7 text-slate-700">
+            <CardContent className="text-sm leading-7 text-slate-300">
               {analysis.summary_json.text}
             </CardContent>
           </Card>
@@ -169,7 +169,7 @@ export default function TrainingAnalysisPage(): React.JSX.Element {
                 <CardTitle>Сильные стороны</CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="list-disc space-y-2 pl-5 text-sm text-slate-700">
+                <ul className="list-disc space-y-2 pl-5 text-sm text-slate-300">
                   {analysis.strengths_json.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
@@ -181,7 +181,7 @@ export default function TrainingAnalysisPage(): React.JSX.Element {
                 <CardTitle>Зоны роста</CardTitle>
               </CardHeader>
               <CardContent>
-                <ul className="list-disc space-y-2 pl-5 text-sm text-slate-700">
+                <ul className="list-disc space-y-2 pl-5 text-sm text-slate-300">
                   {analysis.improvements_json.map((item) => (
                     <li key={item}>{item}</li>
                   ))}
@@ -198,17 +198,17 @@ export default function TrainingAnalysisPage(): React.JSX.Element {
                   {training.hidden_card.company_name} · {training.hidden_card.contact_name}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2 text-sm text-slate-700">
+              <CardContent className="space-y-2 text-sm text-slate-300">
                 <p>
-                  <span className="font-medium text-navy">Боль:</span>{" "}
+                  <span className="font-medium text-accent">Боль:</span>{" "}
                   {training.hidden_card.hidden_pain}
                 </p>
                 <p>
-                  <span className="font-medium text-navy">Поверхностный запрос:</span>{" "}
+                  <span className="font-medium text-accent">Поверхностный запрос:</span>{" "}
                   {training.hidden_card.surface_request}
                 </p>
                 <p>
-                  <span className="font-medium text-navy">Следующий шаг при доверии:</span>{" "}
+                  <span className="font-medium text-accent">Следующий шаг при доверии:</span>{" "}
                   {training.hidden_card.next_step_if_convinced}
                 </p>
               </CardContent>

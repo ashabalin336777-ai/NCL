@@ -59,7 +59,7 @@ function RadarTooltip({
     return null;
   }
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 shadow-sm">
+    <div className="rounded-md border border-white/10 bg-slate-900/80 px-2 py-1 text-xs text-slate-100 shadow-glow-accent backdrop-blur-md">
       {item.fullLabel}: {item.value}%
     </div>
   );
@@ -97,7 +97,7 @@ export function CompetencyRadar({
               <span className="text-slate-300">·</span>
               <span>
                 сам:{" "}
-                <span className="font-semibold tabular-nums text-navy">{replies}</span>
+                <span className="font-semibold tabular-nums text-accent">{replies}</span>
               </span>
               <span className="text-slate-300">·</span>
               <span>
@@ -114,10 +114,10 @@ export function CompetencyRadar({
         <div className="h-[220px] w-full">
           <ResponsiveContainer width="100%" height="100%">
             <RadarChart data={chartData} cx="50%" cy="50%" outerRadius="70%">
-              <PolarGrid stroke="#E5E7EB" />
+              <PolarGrid stroke="rgba(255,255,255,0.08)" />
               <PolarAngleAxis
                 dataKey="label"
-                tick={{ fill: "#374151", fontSize: 11 }}
+                tick={{ fill: "#94a3b8", fontSize: 11 }}
               />
               <PolarRadiusAxis
                 angle={30}
@@ -129,9 +129,9 @@ export function CompetencyRadar({
               <Radar
                 name="Компетенции"
                 dataKey="value"
-                stroke="#1E3A8A"
-                fill="#1E3A8A"
-                fillOpacity={0.2}
+                stroke="#F97316"
+                fill="#F97316"
+                fillOpacity={0.18}
                 strokeWidth={2}
                 isAnimationActive
                 animationDuration={400}
@@ -141,11 +141,11 @@ export function CompetencyRadar({
             </RadarChart>
           </ResponsiveContainer>
         </div>
-        <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-600">
+        <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-slate-400">
           {chartData.map((item) => (
             <li key={item.key} className="flex justify-between gap-2">
               <span>{item.label}</span>
-              <span className="font-medium text-navy">{item.value}%</span>
+              <span className="font-medium text-slate-100">{item.value}%</span>
             </li>
           ))}
         </ul>

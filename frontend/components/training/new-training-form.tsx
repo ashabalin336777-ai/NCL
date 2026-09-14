@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { ApiError, apiFetch } from "@/lib/api";
 import { CLIENT_ROLE_LABELS, DIFFICULTY_LABELS, INDUSTRIES } from "@/lib/labels";
+import { fieldSelectClass } from "@/lib/utils";
 import type { ClientRole, Difficulty, TrainingCreateResponse } from "@/types/training";
 
 export function NewTrainingForm(): React.JSX.Element {
@@ -57,7 +58,7 @@ export function NewTrainingForm(): React.JSX.Element {
             <Label htmlFor="difficulty">Сложность</Label>
             <select
               id="difficulty"
-              className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+              className={fieldSelectClass}
               value={difficulty}
               onChange={(event) => setDifficulty(event.target.value as Difficulty)}
             >
@@ -72,7 +73,7 @@ export function NewTrainingForm(): React.JSX.Element {
             <Label htmlFor="role">Роль клиента</Label>
             <select
               id="role"
-              className="flex h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+              className={fieldSelectClass}
               value={clientRole}
               onChange={(event) => setClientRole(event.target.value as ClientRole)}
             >
@@ -87,7 +88,7 @@ export function NewTrainingForm(): React.JSX.Element {
             <Label htmlFor="industry">Отрасль ({INDUSTRIES.length})</Label>
             <select
               id="industry"
-              className="flex min-h-48 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm"
+              className={`${fieldSelectClass} min-h-48 py-2`}
               value={industry}
               size={Math.min(INDUSTRIES.length, 10)}
               onChange={(event) => setIndustry(event.target.value)}
@@ -101,7 +102,7 @@ export function NewTrainingForm(): React.JSX.Element {
             <p className="text-xs text-slate-500">Выбрано: {industry}</p>
           </div>
           {error ? (
-            <p className="md:col-span-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p className="md:col-span-3 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
               {error}
             </p>
           ) : null}
