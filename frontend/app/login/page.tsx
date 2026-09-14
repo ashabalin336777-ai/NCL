@@ -79,7 +79,8 @@ function LoginForm(): React.JSX.Element {
           </Button>
         </form>
         <p className="mt-5 text-xs leading-5 text-slate-500">
-          Seed: `manager1@ncl.local` / `ChangeMe_Manager_123` · РОП: `admin@ncl.local`
+          Разработчик: `dev@ncl.local` / `ChangeMe_Dev_123` · РОП: `admin@ncl.local` · Менеджер:
+          `manager1@ncl.local`
         </p>
       </CardContent>
     </Card>

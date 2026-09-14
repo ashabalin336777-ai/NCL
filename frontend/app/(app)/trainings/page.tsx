@@ -82,8 +82,13 @@ export default function TrainingsPage(): React.JSX.Element {
                 <div className="text-sm text-slate-600">
                   {outcomeRu ? `${statusRu} · ${outcomeRu}` : statusRu}
                 </div>
-                <div className="text-sm font-semibold text-navy">
-                  {item.overall_score != null ? `${item.overall_score}/10` : "без оценки"}
+                <div className="text-right text-sm">
+                  <p className="font-semibold text-navy">
+                    {item.overall_score != null ? `${item.overall_score}/10` : "без оценки"}
+                  </p>
+                  <p className="mt-0.5 text-xs font-medium text-slate-500">
+                    {Number(item.total_cost_rub).toFixed(2)} ₽
+                  </p>
                 </div>
               </Link>
             );

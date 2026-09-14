@@ -116,9 +116,14 @@ export default function DashboardPage(): React.JSX.Element {
                         : ""}
                     </p>
                   </div>
-                  <span className="text-sm font-semibold text-navy">
-                    {item.overall_score != null ? `${item.overall_score}/10` : "без оценки"}
-                  </span>
+                  <div className="text-right">
+                    <span className="text-sm font-semibold text-navy">
+                      {item.overall_score != null ? `${item.overall_score}/10` : "без оценки"}
+                    </span>
+                    <p className="text-xs font-medium text-slate-500">
+                      {Number(item.total_cost_rub).toFixed(2)} ₽
+                    </p>
+                  </div>
                 </Link>
               ))
             )}

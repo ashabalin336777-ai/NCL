@@ -353,6 +353,7 @@ async def ai_runtime(session: DbSession, _user: CurrentUser) -> AIRuntimePublic:
         analyst_model_id=runtime.analyst_model_id,
         radar_model_id=runtime.radar_model_id,
         timeout_seconds=runtime.timeout_seconds,
-        tariffs=runtime.tariffs,
+        tariffs=runtime.customer_tariffs(),
+        billing_markup_multiplier=float(runtime.billing_markup_multiplier),
         allowed_models=sorted(ALLOWED_MODELS),
     )

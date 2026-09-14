@@ -38,12 +38,11 @@ def assert_neuraldeep_model(model_id: str) -> str:
     model = model_id.strip()
     if is_blocked_model(model):
         raise LLMResponseError(
-            f"Модель '{model}' запрещена: линейка GPT/OpenAI не используется. "
-            "Доступны только модели NeuralDEEP."
+            f"Модель '{model}' запрещена: линейка GPT/OpenAI не используется."
         )
     if model not in ALLOWED_MODELS:
         raise LLMResponseError(
-            f"Модель '{model}' не из каталога NeuralDEEP PRO (РФ). "
+            f"Модель '{model}' недоступна в этом приложении. "
             f"Разрешены: {', '.join(sorted(ALLOWED_MODELS))}."
         )
     return model

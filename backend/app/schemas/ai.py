@@ -87,5 +87,6 @@ class AIRuntimePublic(BaseModel):
     analyst_model_id: str
     radar_model_id: str
     timeout_seconds: int
-    tariffs: dict[str, Any]
+    tariffs: dict[str, Any]  # клиентские ставки (база × markup)
+    billing_markup_multiplier: float = 15
     allowed_models: list[str]

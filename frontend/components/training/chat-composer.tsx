@@ -133,7 +133,7 @@ export function ChatComposer({ disabled, sending, onSend }: ChatComposerProps): 
 
     setTranscribing(true);
     setLiveLine("Распознаю всю фразу…");
-    setVoiceHint("NeuralDEEP Whisper");
+    setVoiceHint("Голосовой ввод");
     try {
       const recognized = await transcribeSpeech(blob, `speech.${ext}`);
       if (!recognized) {
@@ -208,9 +208,7 @@ export function ChatComposer({ disabled, sending, onSend }: ChatComposerProps): 
       setListening(true);
       setElapsedSec(0);
       setLiveLine("Слушаю… говорите всю фразу, затем нажмите «Стоп»");
-      setVoiceHint(
-        isOperaBrowser() ? "Opera · запись целиком → Whisper" : "Запись целиком → Whisper",
-      );
+      setVoiceHint(isOperaBrowser() ? "Opera · запись целиком" : "Запись целиком");
       timerRef.current = window.setInterval(() => {
         setElapsedSec((value) => value + 1);
       }, 1000);
@@ -317,7 +315,7 @@ export function ChatComposer({ disabled, sending, onSend }: ChatComposerProps): 
           variant={listening ? "accent" : "outline"}
           disabled={!secureContext || disabled || sending || engine === "none" || transcribing}
           onClick={() => void toggleVoice()}
-          title="Запись всей фразы, затем распознавание NeuralDEEP"
+          title="Запись всей фразы, затем распознавание речи"
         >
           {listening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
           {listening ? "Стоп" : transcribing ? "Распознаю…" : "Микрофон"}

@@ -57,7 +57,8 @@ def calc_cost(
     prompt_tokens: int,
     completion_tokens: int,
 ) -> Decimal:
-    input_rate, output_rate = runtime.rate_for(model)
+    """Стоимость для клиента: тариф NeuralDEEP × billing_markup_multiplier."""
+    input_rate, output_rate = runtime.customer_rate_for(model)
     raw = (Decimal(prompt_tokens) / Decimal(1000) * input_rate) + (
         Decimal(completion_tokens) / Decimal(1000) * output_rate
     )
@@ -94,10 +95,10 @@ def _headers(runtime: AIRuntimeSettings) -> dict[str, str]:
 
 def _raise_http_error(response: httpx.Response) -> None:
     if response.status_code == 429:
-        raise RateLimitError("NeuralDEEP rate limit exceeded")
+        raise RateLimitError("Слишком много запросов, подождите немного")
     if response.status_code in {401, 403}:
-        raise LLMResponseError("NeuralDEEP rejected the API key")
-    raise LLMResponseError(f"NeuralDEEP error {response.status_code}")
+        raise LLMResponseError("Ошибка авторизации AI-сервиса")
+    raise LLMResponseError(f"Ошибка AI-сервиса ({response.status_code})")
 
 
 async def _post_completion(
@@ -120,7 +121,7 @@ async def _post_completion(
     except httpx.TimeoutException as exc:
         raise LLMTimeoutError() from exc
     except httpx.RequestError as exc:
-        raise LLMResponseError("NeuralDEEP connection failed") from exc
+        raise LLMResponseError("Не удалось подключиться к AI-сервису") from exc
     if response.status_code >= 400:
         _raise_http_error(response)
     return response.json()
@@ -336,14 +337,14 @@ async def stream_text(
             last_error.__cause__ = exc
         except httpx.RequestError as exc:
             logger.warning(
-                "NeuralDEEP stream connect failed (attempt %s): %s", attempt + 1, exc
+                "LLM stream connect failed (attempt %s): %s", attempt + 1, exc
             )
             if collected:
-                raise LLMResponseError("NeuralDEEP connection failed") from exc
-            last_error = LLMResponseError("NeuralDEEP connection failed")
+                raise LLMResponseError("Не удалось подключиться к AI-сервису") from exc
+            last_error = LLMResponseError("Не удалось подключиться к AI-сервису")
             last_error.__cause__ = exc
         except LLMResponseError as exc:
-            if "rejected the API key" in str(exc):
+            if "авторизации" in str(exc).lower() or "api key" in str(exc).lower():
                 raise
             if collected:
                 raise
@@ -355,7 +356,7 @@ async def stream_text(
 
     if isinstance(last_error, LLMTimeoutError):
         raise last_error
-    raise LLMResponseError("NeuralDEEP connection failed") from last_error
+    raise LLMResponseError("Не удалось подключиться к AI-сервису") from last_error
 
 
 async def transcribe_audio(
@@ -389,15 +390,15 @@ async def transcribe_audio(
     except httpx.TimeoutException as exc:
         raise LLMTimeoutError() from exc
     except httpx.RequestError as exc:
-        raise LLMResponseError("NeuralDEEP connection failed") from exc
+        raise LLMResponseError("Не удалось подключиться к сервису распознавания") from exc
 
     if response.status_code >= 400:
         detail = response.text[:400]
-        logger.warning("NeuralDEEP STT error %s: %s", response.status_code, detail)
+        logger.warning("STT error %s: %s", response.status_code, detail)
         if response.status_code == 429:
-            raise RateLimitError("NeuralDEEP rate limit exceeded")
+            raise RateLimitError("Слишком много запросов, подождите немного")
         if response.status_code in {401, 403}:
-            raise LLMResponseError("NeuralDEEP rejected the API key")
+            raise LLMResponseError("Ошибка авторизации сервиса распознавания")
         # fallback model once
         if model != "whisper-1":
             return await transcribe_audio(

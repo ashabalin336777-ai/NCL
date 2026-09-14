@@ -16,13 +16,13 @@ from app.services.neuraldeep_models import (
 )
 
 DEFAULT_TARIFFS: dict[str, dict[str, float]] = {
-    "qwen3.8-27b": {"input": 0.02448, "output": 0.122},
-    "qwen3.8-27b-noreason": {"input": 0.02448, "output": 0.122},
-    "qwen3.6-35b-a3b": {"input": 0.00714, "output": 0.0408},
-    "qwen3.6-35b-a3b-noreason": {"input": 0.00714, "output": 0.0408},
-    "qwen3.6-fp8": {"input": 0.00714, "output": 0.0408},
-    "qwen3.6-fp8-noreason": {"input": 0.00714, "output": 0.0408},
     "kimi-k2.6": {"input": 0.09975, "output": 0.42},
+    "qwen3.6-fp8": {"input": 0.00714, "output": 0.0408},
+    "qwen3.8-27b": {"input": 0.02448, "output": 0.122},
+    "qwen3.6-35b-a3b": {"input": 0.00714, "output": 0.0408},
+    "qwen3.6-fp8-noreason": {"input": 0.00714, "output": 0.0408},
+    "qwen3.8-27b-noreason": {"input": 0.02448, "output": 0.122},
+    "qwen3.6-35b-a3b-noreason": {"input": 0.00714, "output": 0.0408},
 }
 
 
@@ -39,12 +39,35 @@ class AIRuntimeSettings(BaseModel):
     default_input_rate: Decimal = Decimal("0.02448")
     default_output_rate: Decimal = Decimal("0.122")
     tariffs: dict[str, dict[str, float]] = Field(default_factory=lambda: DEFAULT_TARIFFS)
+    # Наценка к себестоимости NeuralDEEP: клиент (менеджер/РОП) платит base × multiplier
+    billing_markup_multiplier: Decimal = Decimal("15")
 
     def rate_for(self, model: str) -> tuple[Decimal, Decimal]:
+        """Базовые ставки NeuralDEEP (без наценки), ₽ / 1k токенов."""
         item = self.tariffs.get(model)
         if item is None:
             return self.default_input_rate, self.default_output_rate
         return Decimal(str(item["input"])), Decimal(str(item["output"]))
+
+    def customer_rate_for(self, model: str) -> tuple[Decimal, Decimal]:
+        """Ставки для клиента: база × множитель наценки."""
+        input_rate, output_rate = self.rate_for(model)
+        mult = self.billing_markup_multiplier
+        if mult <= 0:
+            mult = Decimal("1")
+        return input_rate * mult, output_rate * mult
+
+    def customer_tariffs(self) -> dict[str, dict[str, float]]:
+        mult = float(self.billing_markup_multiplier)
+        if mult <= 0:
+            mult = 1.0
+        return {
+            model: {
+                "input": float(rates["input"]) * mult,
+                "output": float(rates["output"]) * mult,
+            }
+            for model, rates in self.tariffs.items()
+        }
 
 
 def _as_str(value: Any, fallback: str) -> str:
@@ -123,4 +146,7 @@ async def load_ai_settings(session: AsyncSession) -> AIRuntimeSettings:
             stored.get("cost_per_1k_output_tokens_rub"), Decimal("0.122")
         ),
         tariffs=_as_tariffs(stored.get("model_tariffs")),
+        billing_markup_multiplier=_as_decimal(
+            stored.get("billing_markup_multiplier"), Decimal("15")
+        ),
     )

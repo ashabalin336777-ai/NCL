@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { useAuthStore } from "@/store/auth";
 import type { UserRole } from "@/types/api";
+import { roleLabel } from "@/lib/roles";
 
 export function RoleGate({
   allow,
@@ -22,15 +23,28 @@ export function RoleGate({
   const allowed = user != null && allow.includes(user.role);
 
   useEffect(() => {
-    if (!hydrated) return;
-    if (!user || !allowed) {
-      router.replace(fallback);
+    // AppShell already waits for auth; only bounce wrong roles after hydrate.
+    if (!hydrated || !user) return;
+    if (!allowed) {
+      const timer = window.setTimeout(() => {
+        router.replace(fallback);
+      }, 1200);
+      return () => window.clearTimeout(timer);
     }
   }, [allowed, fallback, hydrated, router, user]);
 
-  if (!hydrated || !user || !allowed) {
+  if (!hydrated || !user) {
+    return <div className="p-8 text-sm text-slate-500">Проверка доступа…</div>;
+  }
+
+  if (!allowed) {
     return (
-      <div className="p-8 text-sm text-slate-500">Проверка доступа…</div>
+      <div className="mx-auto max-w-lg rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-950">
+        <p className="font-medium">Раздел недоступен для роли «{roleLabel(user.role)}».</p>
+        <p className="mt-2 text-amber-800">
+          Нужна роль: {allow.map(roleLabel).join(" / ")}. Сейчас откроется дашборд…
+        </p>
+      </div>
     );
   }
 

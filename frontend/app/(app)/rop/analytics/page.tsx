@@ -157,9 +157,14 @@ function AnalyticsInner(): React.JSX.Element {
                   {item.outcome ? ` · ${item.outcome}` : ""}
                 </p>
               </div>
-              <span className="font-semibold text-navy">
-                {item.overall_score != null ? `${item.overall_score}/10` : "—"}
-              </span>
+              <div className="text-right">
+                <span className="font-semibold text-navy">
+                  {item.overall_score != null ? `${item.overall_score}/10` : "—"}
+                </span>
+                <p className="text-xs font-medium text-slate-500">
+                  {Number(item.total_cost_rub).toFixed(2)} ₽
+                </p>
+              </div>
             </Link>
           ))}
         </CardContent>

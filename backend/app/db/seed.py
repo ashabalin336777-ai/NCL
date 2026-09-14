@@ -38,6 +38,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "llm_timeout_seconds": settings.llm_timeout_seconds,
     "model_tariffs": DEFAULT_TARIFFS,
     "billing_min_reserve_rub": 5,
+    "billing_markup_multiplier": 15,
 }
 
 PLACEHOLDER_SETTINGS: dict[str, set[Any]] = {

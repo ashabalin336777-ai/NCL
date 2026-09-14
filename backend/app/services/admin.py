@@ -200,6 +200,14 @@ def _sanitize_setting(key: str, value: Any) -> Any:
         return assert_neuraldeep_base_url(str(value))
     if key in MODEL_KEYS:
         return assert_neuraldeep_model(str(value))
+    if key == "billing_markup_multiplier":
+        try:
+            mult = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ConflictError("billing_markup_multiplier must be a number") from exc
+        if mult <= 0:
+            raise ConflictError("billing_markup_multiplier must be > 0")
+        return mult
     if key == "model_tariffs" and isinstance(value, dict):
         cleaned: dict[str, Any] = {}
         for model, rates in value.items():
