@@ -31,7 +31,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "client_model_id": "qwen3.6-fp8-noreason",
     "card_model_id": "qwen3.6-fp8-noreason",
     "hint_model_id": "qwen3.6-fp8-noreason",
-    "analyst_model_id": "qwen3.8-27b-noreason",
+    "analyst_model_id": "qwen3.6-35b-a3b-noreason",
     "radar_model_id": "qwen3.6-fp8-noreason",
     "cost_per_1k_input_tokens_rub": 0.02448,
     "cost_per_1k_output_tokens_rub": 0.122,
@@ -51,9 +51,16 @@ PLACEHOLDER_SETTINGS: dict[str, set[Any]] = {
     "client_model_id": {"neuraldeep/qwen2.5-72b-instruct", "qwen3.8-27b-noreason", "qwen3.8-27b"},
     "card_model_id": {"qwen3.8-27b-noreason", "qwen3.8-27b"},
     "hint_model_id": {"neuraldeep/saiga-llama3"},
-    "analyst_model_id": {"neuraldeep/qwen2.5-72b-instruct", "qwen3.8-27b"},
+    "analyst_model_id": {
+        "neuraldeep/qwen2.5-72b-instruct",
+        "qwen3.8-27b",
+        "qwen3.8-27b-noreason",
+        "qwen3.6-fp8-noreason",
+        "qwen3.6-fp8",
+    },
     "cost_per_1k_input_tokens_rub": {0.15},
     "cost_per_1k_output_tokens_rub": {0.4, 0.40},
+    "llm_timeout_seconds": {60, 90, 120},
 }
 
 DEFAULT_PROMPTS: list[tuple[str, str]] = [
@@ -98,7 +105,13 @@ async def _ensure_setting(session: AsyncSession, key: str, value: Any) -> None:
     current = row.value
     if isinstance(current, (dict, list)):
         return
-    if current in placeholders:
+    # JSON may store numbers as int/float or as string.
+    candidates = {current}
+    try:
+        candidates.add(int(current))
+    except (TypeError, ValueError):
+        pass
+    if candidates & placeholders:
         row.value = value
 
 

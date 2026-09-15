@@ -21,26 +21,71 @@ ChatMessage = dict[str, str]
 
 _http_client: httpx.AsyncClient | None = None
 
+DEFAULT_LLM_TIMEOUT_SEC = 180
+STT_MIN_TIMEOUT_SEC = 300
 
-def http_timeout(seconds: int) -> httpx.Timeout:
-    return httpx.Timeout(connect=25.0, read=float(seconds), write=30.0, pool=15.0)
+
+def http_timeout(seconds: int, *, write: float | None = None) -> httpx.Timeout:
+    """Read timeout for LLM/STT; write must be high enough for large audio uploads."""
+    write_sec = float(write if write is not None else max(120.0, float(seconds)))
+    # Pool wait must not be tiny: streaming chat can briefly occupy connections.
+    return httpx.Timeout(connect=30.0, read=float(seconds), write=write_sec, pool=60.0)
+
+
+def base_read_timeout(runtime: AIRuntimeSettings) -> int:
+    return max(int(runtime.timeout_seconds), DEFAULT_LLM_TIMEOUT_SEC)
+
+
+def timeout_for_messages(runtime: AIRuntimeSettings, messages: list[ChatMessage]) -> int:
+    """Long pasted/voice replies need extra time before first token."""
+    chars = sum(len(str(item.get("content") or "")) for item in messages)
+    # ~1s per ~600 characters of prompt, capped.
+    boost = min(180, max(0, chars // 600))
+    return base_read_timeout(runtime) + boost
+
+
+def timeout_for_audio(runtime: AIRuntimeSettings, content_bytes: int) -> int:
+    """Short clips should finish quickly; scale only for large payloads."""
+    mb = max(1, (content_bytes + 1024 * 1024 - 1) // (1024 * 1024))
+    if content_bytes < 512 * 1024:
+        return max(base_read_timeout(runtime), 90)
+    sized = 90 + mb * 45
+    return max(base_read_timeout(runtime), STT_MIN_TIMEOUT_SEC, sized)
+
+
+_stt_client: httpx.AsyncClient | None = None
 
 
 async def llm_client() -> httpx.AsyncClient:
     global _http_client
     if _http_client is None or _http_client.is_closed:
         _http_client = httpx.AsyncClient(
-            timeout=http_timeout(120),
+            timeout=http_timeout(DEFAULT_LLM_TIMEOUT_SEC),
             limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
         )
     return _http_client
 
 
+async def stt_client() -> httpx.AsyncClient:
+    """Separate client so chat streams do not starve speech recognition."""
+    global _stt_client
+    if _stt_client is None or _stt_client.is_closed:
+        _stt_client = httpx.AsyncClient(
+            timeout=http_timeout(90),
+            limits=httpx.Limits(max_keepalive_connections=4, max_connections=8),
+        )
+    return _stt_client
+
+
 async def close_llm_client() -> None:
     global _http_client
+    global _stt_client
     if _http_client is not None:
         await _http_client.aclose()
         _http_client = None
+    if _stt_client is not None:
+        await _stt_client.aclose()
+        _stt_client = None
 
 
 def money(value: Decimal | float | int) -> Decimal:
@@ -110,7 +155,7 @@ async def _post_completion(
     assert_neuraldeep_model(str(payload["model"]))
     url = f"{runtime.base_url}/chat/completions"
     client = await llm_client()
-    timeout_sec = read_timeout if read_timeout is not None else max(runtime.timeout_seconds, 120)
+    timeout_sec = read_timeout if read_timeout is not None else base_read_timeout(runtime)
     try:
         response = await client.post(
             url,
@@ -148,6 +193,9 @@ async def complete_text(
 ) -> tuple[str, UsageInfo]:
     last_error: Exception | None = None
     retries = runtime.max_retries if max_retries is None else max_retries
+    effective_timeout = (
+        read_timeout if read_timeout is not None else timeout_for_messages(runtime, messages)
+    )
     for attempt in range(retries + 1):
         try:
             payload = await _post_completion(
@@ -159,7 +207,7 @@ async def complete_text(
                     "max_tokens": max_tokens,
                     "user": session_key,
                 },
-                read_timeout=read_timeout,
+                read_timeout=effective_timeout,
             )
             content = _message_text(payload).strip()
             if not content:
@@ -214,6 +262,9 @@ async def complete_structured(
     working_messages = list(messages)
     schema_keys = ", ".join(schema.model_fields.keys())
     retries = runtime.max_retries if max_retries is None else max_retries
+    effective_timeout = (
+        read_timeout if read_timeout is not None else timeout_for_messages(runtime, messages)
+    )
     for attempt in range(retries + 1):
         try:
             payload = await _post_completion(
@@ -226,7 +277,7 @@ async def complete_structured(
                     "user": session_key,
                     "response_format": {"type": "json_object"},
                 },
-                read_timeout=read_timeout,
+                read_timeout=effective_timeout,
             )
             raw = _message_text(payload)
             parsed = schema.model_validate_json(_extract_json_object(raw))
@@ -267,6 +318,7 @@ async def stream_text(
     max_tokens: int,
     session_key: str,
     max_retries: int | None = None,
+    read_timeout: int | None = None,
 ) -> AsyncIterator[tuple[str, UsageInfo | None]]:
     assert_neuraldeep_model(model)
     payload = {
@@ -281,6 +333,9 @@ async def stream_text(
     url = f"{runtime.base_url}/chat/completions"
     last_error: Exception | None = None
     retries = runtime.max_retries if max_retries is None else max_retries
+    timeout_sec = (
+        read_timeout if read_timeout is not None else timeout_for_messages(runtime, messages)
+    )
 
     for attempt in range(retries + 1):
         collected: list[str] = []
@@ -292,7 +347,7 @@ async def stream_text(
                 url,
                 headers=_headers(runtime),
                 json=payload,
-                timeout=http_timeout(max(runtime.timeout_seconds, 120)),
+                timeout=http_timeout(timeout_sec),
             ) as response:
                 if response.status_code >= 400:
                     await response.aread()
@@ -365,8 +420,10 @@ async def transcribe_audio(
     content: bytes,
     filename: str,
     content_type: str,
-    model: str = "whisper-podlodka-turbo",
+    model: str = "whisper-1",
     language: str = "ru",
+    _attempted: set[str] | None = None,
+    _network_tries: int = 0,
 ) -> tuple[str, UsageInfo]:
     """Speech-to-text через NeuralDEEP (OpenAI-compatible /audio/transcriptions)."""
     model = assert_neuraldeep_model(model)
@@ -378,45 +435,121 @@ async def transcribe_audio(
         "language": language,
         "response_format": "json",
     }
+    timeout_sec = timeout_for_audio(runtime, len(content))
+    attempted = set(_attempted or set())
+    attempted.add(model)
+    fallbacks = ["whisper-1", "gigaam-v3", "whisper-podlodka-turbo"]
+
     try:
-        client = await llm_client()
+        client = await stt_client()
         response = await client.post(
             url,
             headers=headers,
             files=files,
             data=data,
-            timeout=http_timeout(max(runtime.timeout_seconds, 120)),
+            timeout=http_timeout(timeout_sec, write=max(60.0, float(timeout_sec))),
         )
-    except httpx.TimeoutException as exc:
-        raise LLMTimeoutError() from exc
-    except httpx.RequestError as exc:
-        raise LLMResponseError("Не удалось подключиться к сервису распознавания") from exc
-
-    if response.status_code >= 400:
-        detail = response.text[:400]
-        logger.warning("STT error %s: %s", response.status_code, detail)
-        if response.status_code == 429:
-            raise RateLimitError("Слишком много запросов, подождите немного")
-        if response.status_code in {401, 403}:
-            raise LLMResponseError("Ошибка авторизации сервиса распознавания")
-        # fallback model once
-        if model != "whisper-1":
+    except httpx.ConnectTimeout as exc:
+        raise LLMTimeoutError(
+            "Не удалось подключиться к сервису распознавания. Проверьте сеть и попробуйте ещё раз."
+        ) from exc
+    except httpx.PoolTimeout as exc:
+        raise LLMTimeoutError(
+            "Сервис распознавания сейчас занят. Подождите пару секунд и повторите запись."
+        ) from exc
+    except httpx.WriteTimeout as exc:
+        raise LLMTimeoutError(
+            "Не удалось отправить аудио на распознавание. Попробуйте ещё раз."
+        ) from exc
+    except httpx.ReadTimeout as exc:
+        next_model = next((item for item in fallbacks if item not in attempted), None)
+        if next_model:
+            logger.warning("STT read timeout on %s, falling back to %s", model, next_model)
             return await transcribe_audio(
                 runtime,
                 content=content,
                 filename=filename,
                 content_type=content_type,
-                model="whisper-1",
+                model=next_model,
                 language=language,
+                _attempted=attempted,
+                _network_tries=_network_tries,
             )
-        raise LLMResponseError(f"Speech recognition error {response.status_code}")
+        raise LLMTimeoutError(
+            "Распознавание речи не успело завершиться. Повторите короче или отправьте текстом."
+        ) from exc
+    except httpx.TimeoutException as exc:
+        raise LLMTimeoutError(
+            "Распознавание речи не успело завершиться. Повторите короче или отправьте текстом."
+        ) from exc
+    except httpx.RequestError as exc:
+        logger.warning(
+            "STT network error model=%s file=%s bytes=%s try=%s: %s: %s",
+            model,
+            filename,
+            len(content),
+            _network_tries,
+            type(exc).__name__,
+            exc,
+        )
+        if _network_tries < 1:
+            global _stt_client
+            if _stt_client is not None:
+                await _stt_client.aclose()
+                _stt_client = None
+            await asyncio.sleep(0.4)
+            return await transcribe_audio(
+                runtime,
+                content=content,
+                filename=filename,
+                content_type=content_type,
+                model=model,
+                language=language,
+                _attempted=attempted - {model},
+                _network_tries=_network_tries + 1,
+            )
+        next_model = next((item for item in fallbacks if item not in attempted), None)
+        if next_model:
+            return await transcribe_audio(
+                runtime,
+                content=content,
+                filename=filename,
+                content_type=content_type,
+                model=next_model,
+                language=language,
+                _attempted=attempted,
+                _network_tries=0,
+            )
+        raise LLMResponseError(
+            "Не удалось связаться с сервисом распознавания. Повторите запись через несколько секунд."
+        ) from exc
+
+    if response.status_code >= 400:
+        detail = response.text[:400]
+        logger.warning("STT error %s model=%s: %s", response.status_code, model, detail)
+        if response.status_code == 429:
+            raise RateLimitError("Слишком много запросов, подождите немного")
+        if response.status_code in {401, 403}:
+            raise LLMResponseError("Ошибка авторизации сервиса распознавания")
+        next_model = next((item for item in fallbacks if item not in attempted), None)
+        if next_model:
+            return await transcribe_audio(
+                runtime,
+                content=content,
+                filename=filename,
+                content_type=content_type,
+                model=next_model,
+                language=language,
+                _attempted=attempted,
+                _network_tries=_network_tries,
+            )
+        raise LLMResponseError("Сервис распознавания временно недоступен. Попробуйте ещё раз.")
 
     payload = response.json()
     text = str(payload.get("text") or "").strip()
     if not text:
-        raise LLMResponseError("Пустой результат распознавания речи")
+        raise LLMResponseError("Не расслышали речь. Говорите чуть громче и повторите запись.")
 
-    # Whisper часто не отдаёт usage — считаем оценку по длине
     usage = usage_from_payload(runtime, model, payload if "usage" in payload else {}, text)
     if usage.total_tokens <= 0:
         approx = estimate_tokens(text)

@@ -219,12 +219,21 @@ export default function TrainingSessionPage(): React.JSX.Element {
         void refreshRadar(messageId);
       }
     } catch (err) {
-      setError(
+      const raw =
         err instanceof ApiError
           ? err.message
           : err instanceof Error
             ? err.message
-            : "Ошибка отправки сообщения. Нажмите «Отправить» ещё раз.",
+            : "Ошибка отправки сообщения. Нажмите «Отправить» ещё раз.";
+      const lowered = raw.toLowerCase();
+      const timedOut =
+        lowered.includes("timed out") ||
+        lowered.includes("timeout") ||
+        lowered.includes("превышено время");
+      setError(
+        timedOut
+          ? "Ответ ИИ на длинную реплику занял слишком много времени. Подождите и нажмите «Отправить» ещё раз."
+          : raw,
       );
       await refreshTraining();
       throw err;

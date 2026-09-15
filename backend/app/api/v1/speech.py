@@ -5,12 +5,14 @@ from app.api.v1.deps import CurrentUser, DbSession
 from app.core.exceptions import LLMResponseError
 from app.schemas.ai import UsageInfo
 from app.services.ai_settings import load_ai_settings
+from app.services.audio_convert import to_wav_pcm16k_async
 from app.services.llm import transcribe_audio
 
 router = APIRouter(prefix="/speech", tags=["speech"])
 
 MAX_AUDIO_BYTES = 8 * 1024 * 1024
-SPEECH_MODEL = "whisper-podlodka-turbo"
+# whisper-1 — стабильный sync STT NeuralDEEP для коротких клипов.
+SPEECH_MODEL = "whisper-1"
 
 
 class TranscribeResponse(BaseModel):
@@ -33,7 +35,12 @@ async def transcribe_speech(
 
     runtime = await load_ai_settings(session)
     filename = file.filename or "speech.webm"
-    content_type = file.content_type or "audio/webm"
+    content, filename = await to_wav_pcm16k_async(content, filename)
+    content_type = (
+        "audio/wav"
+        if filename.lower().endswith(".wav")
+        else (file.content_type or "application/octet-stream")
+    )
     text, usage = await transcribe_audio(
         runtime,
         content=content,
@@ -42,4 +49,4 @@ async def transcribe_speech(
         model=SPEECH_MODEL,
         language="ru",
     )
-    return TranscribeResponse(text=text, model=SPEECH_MODEL, usage=usage)
+    return TranscribeResponse(text=text, model=usage.model or SPEECH_MODEL, usage=usage)

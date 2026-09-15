@@ -24,6 +24,7 @@ from app.services.neuraldeep_models import (
     assert_neuraldeep_model,
     is_blocked_model,
 )
+from app.services.sol_models import assert_sol_model
 
 MODEL_KEYS = {
     "client_model_id",
@@ -198,6 +199,8 @@ async def activate_prompt(session: AsyncSession, prompt_id: UUID) -> Prompt:
 def _sanitize_setting(key: str, value: Any) -> Any:
     if key == "llm_base_url":
         return assert_neuraldeep_base_url(str(value))
+    if key == "analyst_model_id":
+        return assert_sol_model(str(value))
     if key in MODEL_KEYS:
         return assert_neuraldeep_model(str(value))
     if key == "billing_markup_multiplier":

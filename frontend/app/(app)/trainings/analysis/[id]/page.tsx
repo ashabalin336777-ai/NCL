@@ -110,7 +110,7 @@ export default function TrainingAnalysisPage(): React.JSX.Element {
             <CardTitle>Анализ ещё не готов</CardTitle>
             <CardDescription>
               {runAnalysis.isPending
-                ? "Sol разбирает сессию. Это обычно 12–25 секунд."
+                ? "Sol разбирает сессию. Обычно 10–30 секунд."
                 : finished
                   ? "Сессия завершена. Sol ещё не выставил оценки — запустите разбор."
                   : "Завершите тренировку кнопкой «Завершить и разобрать»."}

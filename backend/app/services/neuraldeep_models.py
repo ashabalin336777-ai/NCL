@@ -6,6 +6,8 @@ ALLOWED_MODELS = frozenset(
     {
         "qwen3.8-27b",
         "qwen3.8-27b-noreason",
+        "qwen3.8-27b-fp8-noreason",
+        "qwen3.8-27b-int4-noreason",
         "qwen3.6-35b-a3b",
         "qwen3.6-35b-a3b-noreason",
         "qwen3.6-fp8",

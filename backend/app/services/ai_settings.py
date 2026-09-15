@@ -14,6 +14,7 @@ from app.services.neuraldeep_models import (
     assert_neuraldeep_model,
     is_blocked_model,
 )
+from app.services.sol_models import DEFAULT_SOL_MODEL_ID, assert_sol_model
 
 DEFAULT_TARIFFS: dict[str, dict[str, float]] = {
     "kimi-k2.6": {"input": 0.09975, "output": 0.42},
@@ -22,6 +23,8 @@ DEFAULT_TARIFFS: dict[str, dict[str, float]] = {
     "qwen3.6-35b-a3b": {"input": 0.00714, "output": 0.0408},
     "qwen3.6-fp8-noreason": {"input": 0.00714, "output": 0.0408},
     "qwen3.8-27b-noreason": {"input": 0.02448, "output": 0.122},
+    "qwen3.8-27b-fp8-noreason": {"input": 0.014, "output": 0.07},
+    "qwen3.8-27b-int4-noreason": {"input": 0.008, "output": 0.04},
     "qwen3.6-35b-a3b-noreason": {"input": 0.00714, "output": 0.0408},
 }
 
@@ -131,8 +134,8 @@ async def load_ai_settings(session: AsyncSession) -> AIRuntimeSettings:
         hint_model_id=assert_neuraldeep_model(
             _as_str(stored.get("hint_model_id"), "qwen3.6-fp8-noreason")
         ),
-        analyst_model_id=assert_neuraldeep_model(
-            _as_str(stored.get("analyst_model_id"), "qwen3.8-27b-noreason")
+        analyst_model_id=assert_sol_model(
+            _as_str(stored.get("analyst_model_id"), DEFAULT_SOL_MODEL_ID)
         ),
         radar_model_id=assert_neuraldeep_model(
             _as_str(stored.get("radar_model_id"), "qwen3.6-fp8-noreason")

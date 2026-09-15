@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, apiFetch } from "@/lib/api";
-import { fieldTextareaClass } from "@/lib/utils";
+import { DEFAULT_SOL_MODEL_ID, SOL_MODEL_OPTIONS } from "@/lib/sol-models";
+import { cn, fieldSelectClass, fieldTextareaClass } from "@/lib/utils";
 import type { AISetting } from "@/types/api";
 
 const SETTING_LABELS: Record<string, string> = {
@@ -41,6 +42,11 @@ const EDITABLE_SCALAR = [
   "billing_min_reserve_rub",
   "billing_markup_multiplier",
 ];
+
+/** Sol has a dedicated selector card — hide from the generic inputs list. */
+const GENERIC_SCALAR = EDITABLE_SCALAR.filter(
+  (key) => key !== "billing_markup_multiplier" && key !== "analyst_model_id",
+);
 
 function isNumericSetting(key: string): boolean {
   return (
@@ -86,10 +92,15 @@ function SettingsInner(): React.JSX.Element {
           : raw == null
             ? key === "billing_markup_multiplier"
               ? "15"
-              : ""
+              : key === "analyst_model_id"
+                ? DEFAULT_SOL_MODEL_ID
+                : ""
             : typeof raw === "string"
               ? raw
               : String(raw);
+    }
+    if (!SOL_MODEL_OPTIONS.some((item) => item.id === next.analyst_model_id)) {
+      next.analyst_model_id = DEFAULT_SOL_MODEL_ID;
     }
     setDraft(next);
     const tariffs = map.model_tariffs;
@@ -101,6 +112,7 @@ function SettingsInner(): React.JSX.Element {
   }, [query.dataUpdatedAt]);
 
   const markup = Number(draft.billing_markup_multiplier || 15);
+  const selectedSol = SOL_MODEL_OPTIONS.find((item) => item.id === draft.analyst_model_id);
   const customerPreview = useMemo(() => {
     try {
       const base = JSON.parse(tariffsJson) as Record<
@@ -181,6 +193,78 @@ function SettingsInner(): React.JSX.Element {
 
       <Card>
         <CardHeader>
+          <CardTitle>Модель Sol (аналитик)</CardTitle>
+          <CardDescription>
+            Короткий список NeuralDEEP для разбора сессий: качество JSON и скорость. Сейчас в API
+            гарантированно доступны 27B-noreason и 35B-A3B-noreason; FP8/Int4 — на будущее, как только
+            вендор опубликует их в каталоге. Сохранение — кнопкой внизу страницы.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-2 md:grid-cols-[220px_1fr] md:items-center">
+            <Label htmlFor="analyst_model_id">Выбранная модель</Label>
+            <select
+              id="analyst_model_id"
+              className={fieldSelectClass}
+              value={draft.analyst_model_id ?? DEFAULT_SOL_MODEL_ID}
+              onChange={(e) =>
+                setDraft((prev) => ({ ...prev, analyst_model_id: e.target.value }))
+              }
+            >
+              {SOL_MODEL_OPTIONS.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.title}
+                  {item.recommended ? " · рекомендуется" : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid gap-3">
+            {SOL_MODEL_OPTIONS.map((item) => {
+              const active = (draft.analyst_model_id ?? DEFAULT_SOL_MODEL_ID) === item.id;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setDraft((prev) => ({ ...prev, analyst_model_id: item.id }))}
+                  className={cn(
+                    "rounded-xl border px-4 py-3 text-left transition",
+                    active
+                      ? "border-accent/50 bg-accent/10"
+                      : "border-white/5 bg-white/[0.02] hover:border-accent/30",
+                  )}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-slate-100">{item.title}</p>
+                    {item.recommended ? (
+                      <span className="rounded-md bg-accent/20 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-accent">
+                        Рекомендуется
+                      </span>
+                    ) : null}
+                    {active ? (
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                        выбрано
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 font-mono text-xs text-slate-500">{item.id}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">{item.comment}</p>
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedSol ? (
+            <p className="text-sm text-slate-400">
+              Сейчас для Sol: <span className="text-slate-200">{selectedSol.title}</span>
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Наценка на токены</CardTitle>
           <CardDescription>
             Множитель применяется ко всем списаниям: карточка, диалог, Terra, радар, Sol
@@ -211,7 +295,7 @@ function SettingsInner(): React.JSX.Element {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          {EDITABLE_SCALAR.filter((key) => key !== "billing_markup_multiplier").map((key) => (
+          {GENERIC_SCALAR.map((key) => (
             <div key={key} className="grid gap-1 md:grid-cols-[220px_1fr]">
               <Label htmlFor={key}>{SETTING_LABELS[key] ?? key}</Label>
               <Input

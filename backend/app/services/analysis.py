@@ -6,6 +6,7 @@ import json
 import logging
 
 from sqlalchemy import Select, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -22,6 +23,7 @@ from app.services import billing as billing_service
 from app.services.ai_settings import load_ai_settings
 from app.services.llm import complete_structured
 from app.services.prompts import format_knowledge_bullets, load_active_prompt
+from app.services.sol_models import SOL_JSON_GUARD
 from app.services.training import (
     _card_from_training,
     _load_options,
@@ -33,6 +35,10 @@ from app.services.training import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Sol JSON is bounded; keep wait shorter than general chat timeouts.
+SOL_READ_TIMEOUT_SEC = 90
+SOL_MAX_RETRIES = 1
 
 
 def _analysis_options() -> list:
@@ -88,7 +94,15 @@ async def run_sol_analysis(
     training: Training,
 ) -> tuple[Analysis, UsageInfo]:
     if training.analysis is not None:
-        raise ConflictError("Analysis already exists for this training")
+        # Idempotent for double-click / React Strict Mode / page remount.
+        zero = UsageInfo(
+            model="cached",
+            prompt_tokens=0,
+            completion_tokens=0,
+            total_tokens=0,
+            cost_rub=Decimal("0"),
+        )
+        return training.analysis, zero
     if not training.messages:
         raise ConflictError("Cannot analyse empty training")
 
@@ -101,12 +115,17 @@ async def run_sol_analysis(
         runtime,
         model=runtime.analyst_model_id,
         messages=[
-            {"role": "system", "content": analyst_prompt.system_prompt_text},
+            {
+                "role": "system",
+                "content": f"{analyst_prompt.system_prompt_text.strip()}\n\n{SOL_JSON_GUARD}",
+            },
             {"role": "user", "content": assemble_analyst_user_prompt(training, card)},
         ],
         schema=AnalysisResultDraft,
         temperature=0.2,
         max_tokens=900,
+        max_retries=SOL_MAX_RETRIES,
+        read_timeout=SOL_READ_TIMEOUT_SEC,
         session_key=f"ncl-sol-{training.id}",
     )
 
@@ -141,7 +160,27 @@ async def run_sol_analysis(
     except ValueError:
         training.outcome = TrainingOutcome.ABANDONED
 
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Parallel Sol calls: the first writer won. Return the stored analysis.
+        await session.rollback()
+        result = await session.execute(
+            select(Analysis).where(Analysis.training_id == training.id)
+        )
+        existing = result.scalar_one_or_none()
+        if existing is None:
+            raise
+        logger.info("Sol analysis race resolved for training %s", training.id)
+        zero = UsageInfo(
+            model=usage.model,
+            prompt_tokens=0,
+            completion_tokens=0,
+            total_tokens=0,
+            cost_rub=Decimal("0"),
+        )
+        return existing, zero
+
     await session.refresh(analysis)
     return analysis, usage
 

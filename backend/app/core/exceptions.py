@@ -42,7 +42,10 @@ class LLMUnavailableError(AppError):
 
 
 class LLMTimeoutError(AppError):
-    def __init__(self, detail: str = "LLM request timed out") -> None:
+    def __init__(
+        self,
+        detail: str = "Превышено время ожидания ответа ИИ. Для длинных голосовых реплик подождите и отправьте ещё раз.",
+    ) -> None:
         super().__init__(status.HTTP_504_GATEWAY_TIMEOUT, detail)
 
 

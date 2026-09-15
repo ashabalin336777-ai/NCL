@@ -5,6 +5,7 @@ import { Loader2, Mic, MicOff, SendHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ApiError, transcribeSpeech } from "@/lib/api";
+import { blobToWav16kMono } from "@/lib/audio-wav";
 import { cn } from "@/lib/utils";
 
 interface ChatComposerProps {
@@ -133,9 +134,19 @@ export function ChatComposer({ disabled, sending, onSend }: ChatComposerProps): 
 
     setTranscribing(true);
     setLiveLine("Распознаю всю фразу…");
-    setVoiceHint("Голосовой ввод");
+    setVoiceHint("Готовлю аудио и отправляю на распознавание");
     try {
-      const recognized = await transcribeSpeech(blob, `speech.${ext}`);
+      let uploadBlob = blob;
+      let filename = `speech.${ext}`;
+      try {
+        uploadBlob = await blobToWav16kMono(blob);
+        filename = "speech.wav";
+      } catch (convertError) {
+        console.warn("WAV convert failed, sending original audio", convertError);
+      }
+      setVoiceHint("Распознаю речь…");
+
+      const recognized = await transcribeSpeech(uploadBlob, filename);
       if (!recognized) {
         setVoiceError("Не расслышали речь. Повторите запись.");
         setLiveLine("");
@@ -148,13 +159,13 @@ export function ChatComposer({ disabled, sending, onSend }: ChatComposerProps): 
       setVoiceError(null);
       setVoiceHint("Готово — можно отправить или дописать");
     } catch (error) {
-      setVoiceError(
+      const raw =
         error instanceof ApiError
           ? error.message
           : error instanceof Error
             ? error.message
-            : "Ошибка распознавания",
-      );
+            : "Ошибка распознавания";
+      setVoiceError(raw);
       setLiveLine("");
     } finally {
       setTranscribing(false);
